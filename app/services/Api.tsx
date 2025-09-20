@@ -1,10 +1,9 @@
 // services/api.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "http://192.168.1.39:3000";
-// ⚠️ mets ton IP locale (trouvée avec ipconfig)
-// si tu utilises Android Emulator → "http://10.0.2.2:3000"
-// si tu es sur iOS Simulator → "http://localhost:3000"
+const API_URL = "http://192.168.1.37:3000";
+
+
 
 type LoginResponse = {
     access_token: string;

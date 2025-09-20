@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
-import { Link, useRouter } from 'expo-router';
-import { login } from "../services/Api.ts"; // ✅ corrige l’import
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert } from "react-native";
+import { Link, useRouter } from "expo-router";
+import { login } from "../services/Api"; // ✅ sans .ts
+import logo from '../../assets/images/logo.png'
 
-const logo = require('../../assets/images/logo.png');
 
 const LoginScreen = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const router = useRouter();
 
@@ -21,7 +21,7 @@ const LoginScreen = () => {
             const token = await login(email, password);
             console.log("Token reçu :", token);
             Alert.alert("Succès", "Connexion réussie !");
-            router.replace("/(tabs)");
+            router.replace("/(tabs)"); // ✅ navigation uniquement ici
         } catch (err: any) {
             Alert.alert("Erreur", err.message || "Impossible de se connecter");
         }
@@ -64,8 +64,8 @@ const LoginScreen = () => {
                         <Image
                             source={
                                 isPasswordVisible
-                                    ? require('../../assets/images/Vector.png')
-                                    : require('../../assets/images/Eye-Pass.png')
+                                    ? require("../../assets/images/Vector.png")
+                                    : require("../../assets/images/Eye-Pass.png")
                             }
                             style={styles.eyeIcon}
                         />
@@ -83,7 +83,10 @@ const LoginScreen = () => {
 
             <View style={styles.signupTextContainer}>
                 <Text style={styles.signupText}>Pas encore de compte ?</Text>
-                <Link href="/signup" style={styles.signupLink}> S'inscrire</Link>
+                <Link href="/signup" style={styles.signupLink}>
+                    {" "}
+                    S'inscrire
+                </Link>
             </View>
         </View>
     );
@@ -92,23 +95,23 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
     outerContainer: {
         flex: 1,
-        backgroundColor: '#EAF7EF',
-        alignItems: 'center',
+        backgroundColor: "#EAF7EF",
+        alignItems: "center",
     },
     topContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        width: '100%',
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        width: "100%",
         padding: 20,
     },
     logoContainer: {
-        backgroundColor: '#28A745',
+        backgroundColor: "#28A745",
         width: 50,
         height: 50,
         borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: "center",
+        alignItems: "center",
     },
     logo: {
         width: 40,
@@ -116,42 +119,42 @@ const styles = StyleSheet.create({
     },
     tagline: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontWeight: "bold",
         marginLeft: 10,
     },
     welcomeTitle: {
         fontSize: 30,
-        fontWeight: 'bold',
+        fontWeight: "bold",
         marginTop: 50,
         marginBottom: 30,
     },
     formContainer: {
-        backgroundColor: '#A8E3B6',
-        width: '90%',
+        backgroundColor: "#A8E3B6",
+        width: "90%",
         padding: 20,
         borderRadius: 20,
-        alignItems: 'flex-start',
+        alignItems: "flex-start",
     },
     label: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
+        fontWeight: "bold",
+        color: "#333",
         marginBottom: 5,
         marginTop: 10,
     },
     input: {
-        width: '100%',
+        width: "100%",
         height: 40,
-        backgroundColor: '#fff',
+        backgroundColor: "#fff",
         borderRadius: 10,
         paddingHorizontal: 15,
         marginBottom: 10,
     },
     passwordInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: '100%',
-        backgroundColor: '#fff',
+        flexDirection: "row",
+        alignItems: "center",
+        width: "100%",
+        backgroundColor: "#fff",
         borderRadius: 10,
         paddingHorizontal: 15,
         marginBottom: 10,
@@ -166,35 +169,35 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
     forgotPasswordLink: {
-        color: '#888',
-        textDecorationLine: 'underline',
-        alignSelf: 'flex-end',
+        color: "#888",
+        textDecorationLine: "underline",
+        alignSelf: "flex-end",
         marginBottom: 20,
     },
     loginButton: {
-        width: '60%',
-        alignSelf: 'center',
-        backgroundColor: '#8BC34A',
+        width: "60%",
+        alignSelf: "center",
+        backgroundColor: "#8BC34A",
         padding: 12,
         borderRadius: 50,
-        alignItems: 'center',
+        alignItems: "center",
         marginTop: 20,
     },
     buttonText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        color: "#fff",
+        fontWeight: "bold",
         fontSize: 16,
     },
     signupTextContainer: {
-        flexDirection: 'row',
+        flexDirection: "row",
         marginTop: 40,
     },
     signupText: {
-        color: '#333',
+        color: "#333",
     },
     signupLink: {
-        color: '#28A745',
-        fontWeight: 'bold',
+        color: "#28A745",
+        fontWeight: "bold",
     },
 });
 

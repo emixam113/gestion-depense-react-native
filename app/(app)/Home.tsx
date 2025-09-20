@@ -4,13 +4,13 @@ import {View, Text, StyleSheet, Image, TouchableOpacity} from "react-native";
 import Colors from '../../constants/Colors';
 import {Link} from "expo-router";
 
-// logo png
-const logo = require('../../assets/images/logo.png');
+
+// @ts-ignore
+import logo from "../../assets/images/logo.png";
 
 const Home = ()=> {
     return (
-        <View
-            View style={styles.container}>
+        <View style={styles.container}>
             <Image
                 source={logo}
                 style={styles.logo}
