@@ -25,7 +25,7 @@ const Home = ()=> {
                 <Link href="/screens/Signup" style={styles.buttonText}>S'inscrire</Link>
             </TouchableOpacity>
 
-            <Link href="/forgot-password" style={styles.forgotPasswordText}>Mot de passe oublié ?</Link>
+            <Link href="/screen/forgot-password" style={styles.forgotPasswordText}>Mot de passe oublié ?</Link>
         </View>
     )
 }

@@ -12,7 +12,11 @@ module.exports = {
             botlogin: "#C3EBD4",
             text: "#DFF7E2",
 
-        }
+        },
+        font-family: {
+    poppins: ["Poppins", "sans-serif"], 
+        accessible: ["Atkinson Hyperlegible", "sans-serif"],
+}
     },
   },
   plugins: [],

@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { login } from "../services/Api"; // ✅ sans .ts
-import logo from '../../assets/images/logo.png'
 
+const logo = require('../../assets/images/logo.png');
 
 const LoginScreen = () => {
     const [email, setEmail] = useState("");
@@ -26,6 +26,7 @@ const LoginScreen = () => {
             Alert.alert("Erreur", err.message || "Impossible de se connecter");
         }
     };
+    console.log('connexion', email, password, )
 
     return (
         <View style={styles.outerContainer}>
@@ -63,9 +64,7 @@ const LoginScreen = () => {
                     <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
                         <Image
                             source={
-                                isPasswordVisible
-                                    ? require("../../assets/images/Vector.png")
-                                    : require("../../assets/images/Eye-Pass.png")
+                                isPasswordVisible ? require("../../assets/images/Vector.png") : require("../../assets/images/Eye-Pass.png")
                             }
                             style={styles.eyeIcon}
                         />
@@ -78,12 +77,13 @@ const LoginScreen = () => {
 
                 <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
                     <Text style={styles.buttonText}>Se Connecter</Text>
+                    <Link href="/Dashboard"/>
                 </TouchableOpacity>
             </View>
 
             <View style={styles.signupTextContainer}>
                 <Text style={styles.signupText}>Pas encore de compte ?</Text>
-                <Link href="/signup" style={styles.signupLink}>
+                <Link href="/Signup" style={styles.signupLink}>
                     {" "}
                     S'inscrire
                 </Link>

@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    Image,
+    Alert,
+} from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { register } from '../services/Api'; // ✅ API register
 
-// Assure-toi que ce chemin d'accès au logo est correct
 const logo = require('../../assets/images/logo.png');
 
 const SignupScreen = () => {
@@ -14,25 +22,34 @@ const SignupScreen = () => {
     const [birthDate, setBirthDate] = useState('');
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+
     const router = useRouter();
 
-    const handleSignup = () => {
-        // Logique d'inscription ici
-        console.log('Inscription avec les informations suivantes :', {
-            firstName,
-            lastName,
-            birthDate,
-            email,
-            password,
-        });
-        Alert.alert('Succès', 'Votre compte a été créé avec succès !');
-        // Redirige l'utilisateur vers l'écran de connexion ou l'écran principal
-        router.replace('/login');
+    const handleSignup = async () => {
+        if (!email || !password || !firstName || !lastName) {
+            Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert('Erreur', 'Les mots de passe ne correspondent pas.');
+            return;
+        }
+
+        try {
+            // 🔑 Appel API
+            await register(email, password, `${firstName} ${lastName}`);
+
+            Alert.alert('Succès', 'Votre compte a été créé !');
+            router.replace('/login'); // redirige vers login
+        } catch (err: any) {
+            Alert.alert('Erreur', err.message || "Impossible de créer un compte");
+        }
     };
 
     return (
         <View style={styles.outerContainer}>
-            {/* Conteneur pour le logo et le slogan */}
+            {/* Logo + tagline */}
             <View style={styles.topContainer}>
                 <View style={styles.logoContainer}>
                     <Image source={logo} style={styles.logo} />
@@ -40,25 +57,25 @@ const SignupScreen = () => {
                 <Text style={styles.tagline}>L'outil pour la nouvelle finance</Text>
             </View>
 
-            {/* Titre "Création d'un compte" */}
+            {/* Titre */}
             <Text style={styles.signupTitle}>Création d'un compte</Text>
 
-            {/* Conteneur vert clair pour le formulaire */}
+            {/* Formulaire */}
             <View style={styles.formContainer}>
                 <View style={styles.row}>
-                    {/* Champ Nom */}
+                    {/* Nom */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Nom</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="dupont"
+                            placeholder="Dupont"
                             placeholderTextColor="#888"
                             value={lastName}
                             onChangeText={setLastName}
                         />
                     </View>
 
-                    {/* Champ E-mail */}
+                    {/* Email */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>E-mail</Text>
                         <TextInput
@@ -74,19 +91,19 @@ const SignupScreen = () => {
                 </View>
 
                 <View style={styles.row}>
-                    {/* Champ Prénom */}
+                    {/* Prénom */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Prénom</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="jean"
+                            placeholder="Jean"
                             placeholderTextColor="#888"
                             value={firstName}
                             onChangeText={setFirstName}
                         />
                     </View>
 
-                    {/* Champ Mot de passe */}
+                    {/* Mot de passe */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Mot de passe</Text>
                         <View style={styles.passwordInputContainer}>
@@ -98,9 +115,15 @@ const SignupScreen = () => {
                                 value={password}
                                 onChangeText={setPassword}
                             />
-                            <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+                            <TouchableOpacity
+                                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                            >
                                 <Image
-                                    source={isPasswordVisible ? require('../../assets/images/Eye-Pass.png') : require('../../assets/images/Vector.png')}
+                                    source={
+                                        isPasswordVisible
+                                            ? require('../../assets/images/Eye-Pass.png')
+                                            : require('../../assets/images/Vector.png')
+                                    }
                                     style={styles.eyeIcon}
                                 />
                             </TouchableOpacity>
@@ -109,7 +132,7 @@ const SignupScreen = () => {
                 </View>
 
                 <View style={styles.row}>
-                    {/* Champ Date de naissance */}
+                    {/* Date de naissance (facultatif pour l’API) */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Date de naissance</Text>
                         <TextInput
@@ -122,21 +145,29 @@ const SignupScreen = () => {
                         />
                     </View>
 
-                    {/* Champ Confirmation */}
+                    {/* Confirmation */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Confirmation</Text>
                         <View style={styles.passwordInputContainer}>
                             <TextInput
                                 style={styles.passwordInput}
-                                placeholder="azerty1234"
+                                placeholder="*************"
                                 placeholderTextColor="#888"
                                 secureTextEntry={!isConfirmPasswordVisible}
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
                             />
-                            <TouchableOpacity onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
+                            <TouchableOpacity
+                                onPress={() =>
+                                    setIsConfirmPasswordVisible(!isConfirmPasswordVisible)
+                                }
+                            >
                                 <Image
-                                    source={isConfirmPasswordVisible ? require('../../assets/images/Eye-Pass.png') : require('../../assets/images/Vector.png')}
+                                    source={
+                                        isConfirmPasswordVisible
+                                            ? require('../../assets/images/Eye-Pass.png')
+                                            : require('../../assets/images/Vector.png')
+                                    }
                                     style={styles.eyeIcon}
                                 />
                             </TouchableOpacity>
@@ -144,17 +175,22 @@ const SignupScreen = () => {
                     </View>
                 </View>
 
-                {/* Bouton "S'inscrire" */}
-                <Text style={styles.termsText}>En cliquant, vous acceptez les conditions générale d'utilisation</Text>
+                {/* Conditions + bouton */}
+                <Text style={styles.termsText}>
+                    En cliquant, vous acceptez les conditions générales d'utilisation
+                </Text>
                 <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
                     <Text style={styles.buttonText}>S'inscrire</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Lien pour la connexion */}
+            {/* Lien vers login */}
             <View style={styles.loginTextContainer}>
                 <Text style={styles.loginText}>Déjà un compte ?</Text>
-                <Link href="/login" style={styles.loginLink}> Se connecter</Link>
+                <Link href="/login" style={styles.loginLink}>
+                    {' '}
+                    Se connecter
+                </Link>
             </View>
         </View>
     );
