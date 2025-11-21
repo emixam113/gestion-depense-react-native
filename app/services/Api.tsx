@@ -1,9 +1,9 @@
-// services/api.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "http://192.168.1.39:3000"; // ⚠️ Vérifie que ton backend écoute bien sur cette IP
+// Adresse IP de ton PC via Wi-Fi
+const API_URL = "http://192.168.1.37:3000";
 
-// Réponse attendue lors du login/signup
+// Type pour la réponse de succès
 type AuthResponse = {
     access_token: string;
     user?: {
@@ -14,34 +14,47 @@ type AuthResponse = {
     };
 };
 
+// Type pour gérer les erreurs renvoyées par l'API
+type ApiError = {
+    message: string;
+    statusCode?: number;
+};
+
 // ---- LOGIN ----
 export async function login(email: string, password: string): Promise<AuthResponse> {
-    console.log("👉 Tentative de login", email, password);
+    console.log("Tentative de login pour :", email);
 
-    const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-    });
+    try {
+        const response = await fetch(`${API_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
 
-    console.log("📡 Login status:", response.status);
+        console.log("Login status:", response.status);
 
-    const data: AuthResponse = await response.json().catch(() => null);
-    console.log("📩 Réponse login JSON:", data);
+        const data = await response.json();
 
-    if (!response.ok || !data) {
-        throw new Error(data?.message || "Email ou mot de passe incorrect");
+        if (!response.ok) {
+            const errorData = data as ApiError;
+            throw new Error(errorData.message || "Email ou mot de passe incorrect");
+        }
+
+        // Stocker token et user
+        const authData = data as AuthResponse;
+        if (authData.access_token) {
+            await AsyncStorage.setItem("token", authData.access_token);
+        }
+        if (authData.user) {
+            await AsyncStorage.setItem("user", JSON.stringify(authData.user));
+        }
+
+        return authData;
+
+    } catch (error: any) {
+        console.error("Erreur Login:", error.message);
+        throw error;
     }
-
-    // ✅ Stocker token et user
-    if (data.access_token) {
-        await AsyncStorage.setItem("token", data.access_token);
-    }
-    if (data.user) {
-        await AsyncStorage.setItem("user", JSON.stringify(data.user));
-    }
-
-    return data;
 }
 
 // ---- SIGNUP ----
@@ -53,69 +66,87 @@ export async function signup(
     confirmPassword: string,
     birthDate: string
 ): Promise<AuthResponse> {
-    console.log("👉 Tentative de signup avec :", { firstName, lastName, email, birthDate });
+    console.log("Tentative de signup :", email);
 
-    const response = await fetch(`${API_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            firstName,
-            lastName,
-            email,
-            password,
-            confirmPassword,
-            birthDate,
-        }),
-    });
+    try {
+        const response = await fetch(`${API_URL}/auth/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                firstName,
+                lastName,
+                email,
+                password,
+                confirmPassword,
+                birthDate,
+            }),
+        });
 
-    console.log("📡 Signup status:", response.status);
+        console.log("Signup status:", response.status);
+        const data = await response.json();
 
-    const data: AuthResponse = await response.json().catch(() => null);
-    console.log("📩 Réponse signup JSON:", data);
+        if (!response.ok) {
+            const errorData = data as ApiError;
+            throw new Error(errorData.message || "Erreur lors de l'inscription");
+        }
 
-    if (!response.ok || !data) {
-        throw new Error(data?.message || "Erreur lors de l'inscription");
+        // Stocker token et user
+        const authData = data as AuthResponse;
+        if (authData.access_token) {
+            await AsyncStorage.setItem("token", authData.access_token);
+        }
+        if (authData.user) {
+            await AsyncStorage.setItem("user", JSON.stringify(authData.user));
+        }
+
+        return authData;
+
+    } catch (error: any) {
+        console.error("Erreur Signup:", error.message);
+        throw error;
     }
-
-    // ✅ Stocker token et user
-    if (data.access_token) {
-        await AsyncStorage.setItem("token", data.access_token);
-    }
-    if (data.user) {
-        await AsyncStorage.setItem("user", JSON.stringify(data.user));
-    }
-
-    return data;
 }
 
-// ---- REQUÊTES PROTÉGÉES ----
-export async function getWithAuth(endpoint: string): Promise<any> {
+// ---- REQUÊTES PROTÉGÉES (Générique T) ----
+export async function getWithAuth<T>(endpoint: string): Promise<T> {
     const token = await AsyncStorage.getItem("token");
-    console.log("🔑 Token récupéré depuis AsyncStorage:", token);
 
     if (!token) {
+        console.warn("Pas de token trouvé");
         throw new Error("Utilisateur non connecté");
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
+    const url = endpoint.startsWith("/") ? `${API_URL}${endpoint}` : `${API_URL}/${endpoint}`;
 
-    console.log("📡 Requête protégée status:", response.status);
+    try {
+        const response = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
 
-    const data = await response.json().catch(() => null);
-    console.log("📩 Réponse requête protégée:", data);
+        console.log(`GET ${endpoint} status:`, response.status);
 
-    if (!response.ok) {
-        throw new Error(data?.message || "Erreur lors de la requête protégée");
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorData = data as ApiError;
+            throw new Error(errorData.message || "Erreur lors de la requête protégée");
+        }
+
+        return data as T;
+
+    } catch (error: any) {
+        console.error(`Erreur GET ${endpoint}:`, error.message);
+        throw error;
     }
-
-    return data;
 }
 
 // ---- LOGOUT ----
 export async function logout(): Promise<void> {
-    console.log("🚪 Déconnexion en cours...");
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("user");
+    console.log("Déconnexion...");
+    try {
+        await AsyncStorage.removeItem("token");
+        await AsyncStorage.removeItem("user");
+    } catch (e) {
+        console.error("Erreur lors du logout", e);
+    }
 }
