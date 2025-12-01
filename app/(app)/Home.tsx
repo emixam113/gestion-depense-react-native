@@ -4,7 +4,6 @@ import {View, Text, StyleSheet, Image, TouchableOpacity} from "react-native";
 import Colors from '../../constants/Colors';
 import {Link} from "expo-router";
 
-
 // @ts-ignore
 import logo from "../../assets/images/logo.png";
 
