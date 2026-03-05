@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+import { useAccessibility } from '../Context/Accessibility';
+import { useTheme } from '../Context/ThemeContext';
 
 type TransactionType = "income" | "expense";
 
@@ -19,6 +21,9 @@ interface AddExpenseProps {
 }
 
 export default function AddExpense({ onAdd, categories }: AddExpenseProps) {
+	const { fontFamily } = useAccessibility();
+	const { colors } = useTheme();
+
 	const [description, setDescription] = useState("");
 	const [amount, setAmount] = useState("");
 	const [category, setCategory] = useState(categories[0] || "");
@@ -44,7 +49,6 @@ export default function AddExpense({ onAdd, categories }: AddExpenseProps) {
 
 		onAdd(newExpense);
 
-		// reset form
 		setDescription("");
 		setAmount("");
 		setCategory(categories[0] || "");
@@ -52,131 +56,188 @@ export default function AddExpense({ onAdd, categories }: AddExpenseProps) {
 	};
 
 	return (
-		<View style={styles.container}>
-			<Text style={styles.title}>➕ Ajouter une transaction</Text>
+		<View style={[styles.container, { backgroundColor: colors.cardBackground }]}>
+			<Text style={[styles.title, { fontFamily: fontFamily.bold, color: colors.text }]}>
+				➕ Ajouter une transaction
+			</Text>
+
 			<TextInput
-				style={styles.input}
+				style={[
+					styles.input,
+					{
+						fontFamily: fontFamily.regular,
+						backgroundColor: colors.inputBackground,
+						color: colors.text,
+						borderColor: colors.border
+					}
+				]}
 				placeholder="Description"
+				placeholderTextColor={colors.textSecondary}
 				value={description}
 				onChangeText={setDescription}
 			/>
+
 			<TextInput
-				style={styles.input}
+				style={[
+					styles.input,
+					{
+						fontFamily: fontFamily.regular,
+						backgroundColor: colors.inputBackground,
+						color: colors.text,
+						borderColor: colors.border
+					}
+				]}
 				placeholder="Montant"
+				placeholderTextColor={colors.textSecondary}
 				keyboardType="numeric"
 				value={amount}
 				onChangeText={(text) => setAmount(text.replace(/[^0-9,.]/g, ""))}
 			/>
-			<Text style={styles.label}>Catégorie :</Text>
+
+			<Text style={[styles.label, { fontFamily: fontFamily.bold, color: colors.text }]}>
+				Catégorie :
+			</Text>
+
 			{categories.length > 0 ? (
-				<View style={styles.pickerContainer}>
-					<Picker selectedValue={category} onValueChange={(itemValue) => setCategory(itemValue)}>
+				<View style={[styles.pickerContainer, {
+					borderColor: colors.border,
+					backgroundColor: colors.surface
+				}]}>
+					<Picker
+						selectedValue={category}
+						onValueChange={(itemValue) => setCategory(itemValue)}
+						style={{ color: colors.text }}
+						dropdownIconColor={colors.text}
+					>
 						{categories.map((cat) => (
 							<Picker.Item key={cat} label={cat} value={cat} />
 						))}
 					</Picker>
 				</View>
 			) : (
-				<Text style={styles.noCategoryText}>Veuillez ajouter une catégorie.</Text>
+				<Text style={[styles.noCategoryText, { fontFamily: fontFamily.regular, color: colors.error }]}>
+					Veuillez ajouter une catégorie.
+				</Text>
 			)}
+
 			<View style={styles.row}>
 				<TouchableOpacity
-					style={[styles.typeButton, type === "income" && styles.activeIncome]}
+					style={[
+						styles.typeButton,
+						type === "income" ? styles.activeIncome : {
+							backgroundColor: colors.inputBackground,
+							borderColor: colors.border
+						}
+					]}
 					onPress={() => setType("income")}
 				>
-					<Text style={[styles.typeText, type !== "income" && styles.inactiveText]}>Revenu</Text>
+					<Text style={[
+						styles.typeText,
+						{ fontFamily: fontFamily.bold },
+						type === "income" ? { color: '#FFF' } : { color: colors.textSecondary }
+					]}>
+						Revenu
+					</Text>
 				</TouchableOpacity>
+
 				<TouchableOpacity
-					style={[styles.typeButton, type === "expense" && styles.activeExpense]}
+					style={[
+						styles.typeButton,
+						type === "expense" ? styles.activeExpense : {
+							backgroundColor: colors.inputBackground,
+							borderColor: colors.border
+						}
+					]}
 					onPress={() => setType("expense")}
 				>
-					<Text style={[styles.typeText, type !== "expense" && styles.inactiveText]}>Dépense</Text>
+					<Text style={[
+						styles.typeText,
+						{ fontFamily: fontFamily.bold },
+						type === "expense" ? { color: '#FFF' } : { color: colors.textSecondary }
+					]}>
+						Dépense
+					</Text>
 				</TouchableOpacity>
 			</View>
+
 			<TouchableOpacity
-				style={[styles.addButton, categories.length === 0 && styles.disabledButton]}
+				style={[
+					styles.addButton,
+					{ backgroundColor: colors.success },
+					categories.length === 0 && { backgroundColor: colors.border, opacity: 0.5 }
+				]}
 				onPress={handleSubmit}
 				disabled={categories.length === 0}
 			>
-				<Text style={styles.addButtonText}>Ajouter</Text>
+				<Text style={[styles.addButtonText, { fontFamily: fontFamily.bold }]}>
+					Ajouter
+				</Text>
 			</TouchableOpacity>
 		</View>
 	);
 }
 
-const styles=StyleSheet.create({
+const styles = StyleSheet.create({
 	container: {
-		backgroundColor: "#fff",
-		padding: 16,
-		borderRadius: 12,
+		padding: 20,
+		borderRadius: 16,
 		marginVertical: 10,
 	},
 	title: {
-		fontSize: 18,
-		fontWeight: "bold",
-		marginBottom: 10
+		fontSize: 20,
+		marginBottom: 16,
 	},
 	input: {
-		backgroundColor: "#F2F2F2",
-		padding: 10,
-		borderRadius: 8,
-		marginBottom: 10,
+		padding: 14,
+		borderRadius: 12,
+		marginBottom: 16,
+		fontSize: 16,
+		borderWidth: 1,
 	},
 	label: {
-		fontWeight: "bold",
-		marginTop: 10,
-		color: "#555",
+		marginBottom: 8,
+		fontSize: 16,
 	},
 	pickerContainer: {
-		borderColor: "#E0E0E0",
 		borderWidth: 1,
-		borderRadius: 8,
-		marginBottom:10,
+		borderRadius: 12,
+		marginBottom: 16,
+		overflow: 'hidden',
 	},
 	noCategoryText: {
-		color: "#FF6B6B",
 		fontStyle: "italic",
-		marginTop: 10,
+		marginBottom: 16,
 	},
 	row: {
 		flexDirection: "row",
-		justifyContent: "space-around",
-		marginVertical: 10,
+		gap: 12,
+		marginBottom: 16,
 	},
 	typeButton: {
-		padding: 10,
-		borderRadius: 8,
-		backgroundColor: "#DDD",
-		width: "45%",
+		flex: 1,
+		padding: 14,
+		borderRadius: 12,
 		alignItems: "center",
+		borderWidth: 1,
 	},
-
 	activeIncome: {
 		backgroundColor: "#2CC26D",
+		borderColor: "#2CC26D",
 	},
 	activeExpense: {
 		backgroundColor: "#FF6B6B",
+		borderColor: "#FF6B6B",
 	},
 	typeText: {
-		color: "#FFF",
-		fontWeight: "bold",
-	},
-	inactiveText: {
-		color: "#333",
+		fontSize: 16,
 	},
 	addButton: {
-		backgroundColor: "#2CC26D",
-		padding: 10,
-		borderRadius: 8,
+		padding: 16,
+		borderRadius: 12,
 		alignItems: "center",
-		marginTop: 10,
-	},
-	disabledButton: {
-		backgroundColor: "#A9A9A9",
 	},
 	addButtonText: {
 		color: "#FFF",
-		fontWeight: "bold",
-		fontSize: 16
+		fontSize: 16,
 	},
-})
+});

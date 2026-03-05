@@ -1,42 +1,54 @@
 import { AccessibilityProvider } from './Context/Accessibility';
+import { ThemeProvider } from './Context/ThemeContext';
 import { useFonts } from 'expo-font';
-import {
-	Poppins_400Regular,
-	Poppins_600SemiBold,
-	Poppins_700Bold
-} from '@expo-google-fonts/poppins';
-import {
-	AtkinsonHyperlegible_400Regular,
-	AtkinsonHyperlegible_700Bold
-} from '@expo-google-fonts/atkinson-hyperlegible';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { NotificationService } from './services/NotificationService';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-	const [fontsLoaded] = useFonts({
-		'Poppins-Regular': Poppins_400Regular,
-		'Poppins-SemiBold': Poppins_600SemiBold,
-		'Poppins-Bold': Poppins_700Bold,
-		'AtkinsonHyperlegible-Regular': AtkinsonHyperlegible_400Regular,
-		'AtkinsonHyperlegible-Bold': AtkinsonHyperlegible_700Bold,
-	});
+    const [fontsLoaded] = useFonts({
+       'Atkinson-Regular': require('../assets/fonts/AtkinsonHyperlegible-Regular.ttf'),
+       'Atkinson-Bold': require('../assets/fonts/AtkinsonHyperlegible-Bold.ttf')
+    });
 
-	useEffect(() => {
-		if (fontsLoaded) {
-			SplashScreen.hideAsync();
-		}
-	}, [fontsLoaded]);
+    // Gestion du Splash Screen
+    useEffect(() => {
+       if (fontsLoaded) {
+          SplashScreen.hideAsync();
+       }
+    }, [fontsLoaded]);
 
-	if (!fontsLoaded) {
-		return null;
-	}
+    // --- INITIALISATION DES NOTIFICATIONS ---
+    useEffect(() => {
+        const setupNotifications = async () => {
+            // Demande la permission à l'utilisateur
+            const hasPermission = await NotificationService.requestPermissions();
 
-	return (
-		<AccessibilityProvider>
-			<Stack />
-		</AccessibilityProvider>
-	);
+            if (hasPermission) {
+                // Configure un rappel quotidien par défaut à 20h00
+                // Tu pourras plus tard rendre cela réglable dans les paramètres
+                await NotificationService.scheduleDailyReminder(20, 0);
+                console.log("Notifications configurées avec succès !");
+            } else {
+                console.log("Permissions de notification refusées.");
+            }
+        };
+
+        setupNotifications();
+    }, []);
+
+ if (!fontsLoaded) {
+       return null;
+ }
+
+    return (
+       <ThemeProvider>
+          <AccessibilityProvider>
+             <Stack />
+          </AccessibilityProvider>
+       </ThemeProvider>
+    );
 }

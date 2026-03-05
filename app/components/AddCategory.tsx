@@ -5,37 +5,54 @@ import {
 	TextInput,
 	StyleSheet,
 	TouchableOpacity,
-	Alert
+	Alert,
+	ScrollView
 } from "react-native";
-// Ensure the path is correct for your TypeScript types
 import { Category } from '../Types/category';
+import { useTheme } from '../Context/ThemeContext';
+import { useAccessibility } from '../Context/Accessibility';
 
 interface Props {
 	token: string | null;
 	onCategoryAdded?: (category: Category) => void;
 }
 
-// Use a constant for the API base URL
 const BASE_API_URL = "http://192.168.1.39:3000";
 
+// Couleurs prédéfinies
+const PRESET_COLORS = [
+	{ name: 'Vert', hex: '#2CC26D' },
+	{ name: 'Bleu', hex: '#3B82F6' },
+	{ name: 'Rouge', hex: '#EF4444' },
+	{ name: 'Jaune', hex: '#F59E0B' },
+	{ name: 'Violet', hex: '#8B5CF6' },
+	{ name: 'Rose', hex: '#EC4899' },
+	{ name: 'Orange', hex: '#F97316' },
+	{ name: 'Cyan', hex: '#06B6D4' },
+	{ name: 'Indigo', hex: '#6366F1' },
+	{ name: 'Lime', hex: '#84CC16' },
+];
+
 const AddCategory: React.FC<Props> = ({ token, onCategoryAdded }) => {
-	// State variable names are now in English
+	const { colors } = useTheme();
+	const { fontFamily } = useAccessibility();
+
 	const [name, setName] = useState("");
-	const [color, setColor] = useState("#34D399");
+	const [color, setColor] = useState("#2CC26D");
+	const [customMode, setCustomMode] = useState(false); // Mode personnalisé ou prédéfini
 
 	const handleSubmit = async () => {
 		if (!token) {
-			Alert.alert("Authentication Error", "Please log in to add a category.");
+			Alert.alert("Erreur d'authentification", "Veuillez vous connecter pour ajouter une catégorie.");
 			return;
 		}
 		if (!name.trim()) {
-			Alert.alert("Input Error", "Category name is required.");
+			Alert.alert("Erreur", "Le nom de la catégorie est requis.");
 			return;
 		}
 
-		// Basic HEX color validation
 		if (!/^#([0-9A-Fa-f]{3}){1,2}$/.test(color)) {
-			Alert.alert("Color Error", "Please enter a valid HEX color code (e.g., #RRGGBB).");
+			Alert.alert("Erreur de couleur", "Veuillez entrer un code HEX valide (ex: #RRGGBB).");
 			return;
 		}
 
@@ -46,132 +63,273 @@ const AddCategory: React.FC<Props> = ({ token, onCategoryAdded }) => {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${token}`,
 				},
-				// Request body keys are consistent with the backend model
 				body: JSON.stringify({ name, color }),
 			});
 
 			if (res.status === 401) {
-				throw new Error("Access denied. Token is invalid or expired.");
+				throw new Error("Accès refusé. Token invalide ou expiré.");
 			}
 			if (!res.ok) {
 				const errorData = await res.json();
-				throw new Error(errorData.message || "Error adding the category.");
+				throw new Error(errorData.message || "Erreur lors de l'ajout de la catégorie.");
 			}
 
 			const newCategory: Category = await res.json();
 
-			// Success logic
 			setName("");
-			setColor("#34D399");
-			Alert.alert("Success", `Category '${newCategory.name}' has been added.`);
+			setColor("#2CC26D");
+			Alert.alert("Succès", `Catégorie '${newCategory.name}' ajoutée.`);
 
-			// Callback execution
 			onCategoryAdded?.(newCategory);
 
 		} catch (err) {
-			console.error("Add category error:", err);
-			Alert.alert("API Error", err instanceof Error ? err.message : "An unknown error occurred.");
+			console.error("Erreur ajout catégorie:", err);
+			Alert.alert("Erreur API", err instanceof Error ? err.message : "Une erreur inconnue s'est produite.");
 		}
 	};
 
 	return (
-		<View style={styles.container}>
-			<Text style={styles.heading}>Add Category</Text>
+		<View style={[styles.container, { backgroundColor: colors.surface }]}>
+			<Text style={[styles.heading, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
+				➕ Ajouter une catégorie
+			</Text>
 
-			<View style={styles.inputGroup}>
+			{/* Nom de la catégorie */}
+			<TextInput
+				style={[
+					styles.input,
+					{
+						fontFamily: fontFamily.regular,
+						backgroundColor: colors.inputBackground,
+						color: colors.text,
+						borderColor: colors.border
+					}
+				]}
+				placeholder="Nom de la catégorie"
+				placeholderTextColor={colors.textSecondary}
+				value={name}
+				onChangeText={setName}
+				autoCapitalize="words"
+			/>
 
-				{/* 1. Category Name Input */}
-				<TextInput
-					style={[styles.input, styles.nameInput]}
-					placeholder="Category Name"
-					value={name}
-					onChangeText={setName}
-					autoCapitalize="words"
-				/>
+			{/* Toggle entre prédéfini et personnalisé */}
+			<View style={styles.modeToggle}>
+				<TouchableOpacity
+					style={[
+						styles.modeButton,
+						!customMode && styles.modeButtonActive,
+						{
+							borderColor: colors.border,
+							backgroundColor: !customMode ? colors.primary : 'transparent'
+						}
+					]}
+					onPress={() => setCustomMode(false)}
+				>
+					<Text style={[
+						styles.modeButtonText,
+						{ fontFamily: fontFamily.regular },
+						!customMode && styles.modeButtonTextActive
+					]}>
+						Prédéfinies
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity
+					style={[
+						styles.modeButton,
+						customMode && styles.modeButtonActive,
+						{
+							borderColor: colors.border,
+							backgroundColor: customMode ? colors.primary : 'transparent'
+						}
+					]}
+					onPress={() => setCustomMode(true)}
+				>
+					<Text style={[
+						styles.modeButtonText,
+						{ fontFamily: fontFamily.regular },
+						customMode && styles.modeButtonTextActive
+					]}>
+						Personnalisée
+					</Text>
+				</TouchableOpacity>
+			</View>
 
-				{/* 2. Color Input and Preview */}
-				<View style={styles.colorWrapper}>
+			{/* Couleurs prédéfinies */}
+			{!customMode && (
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorGrid}>
+					{PRESET_COLORS.map((preset) => (
+						<TouchableOpacity
+							key={preset.hex}
+							style={[
+								styles.colorCircle,
+								{ backgroundColor: preset.hex },
+								color === preset.hex && styles.colorCircleSelected
+							]}
+							onPress={() => setColor(preset.hex)}
+						>
+							{color === preset.hex && (
+								<Text style={styles.checkmark}>✓</Text>
+							)}
+						</TouchableOpacity>
+					))}
+				</ScrollView>
+			)}
+
+			{/* Couleur personnalisée */}
+			{customMode && (
+				<View style={[styles.customColorRow, { borderColor: colors.border }]}>
 					<View style={[styles.colorPreview, { backgroundColor: color }]} />
-
 					<TextInput
-						style={styles.colorInput}
-						placeholder="#HEX Code"
+						style={[
+							styles.colorInput,
+							{
+								fontFamily: fontFamily.regular,
+								color: colors.text,
+								backgroundColor: colors.inputBackground
+							}
+						]}
+						placeholder="#RRGGBB"
+						placeholderTextColor={colors.textSecondary}
 						value={color}
 						onChangeText={setColor}
 						maxLength={7}
 						autoCapitalize="none"
 					/>
 				</View>
+			)}
 
-				{/* 3. Submit Button */}
-				<TouchableOpacity
-					style={styles.button}
-					onPress={handleSubmit}
-				>
-					<Text style={styles.buttonText}>Add</Text>
-				</TouchableOpacity>
+			{/* Aperçu */}
+			<View style={styles.preview}>
+				<Text style={[styles.previewLabel, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
+					Aperçu :
+				</Text>
+				<View style={[styles.previewTag, { backgroundColor: color }]}>
+					<Text style={[styles.previewText, { fontFamily: fontFamily.semiBold }]}>
+						{name || "Catégorie"}
+					</Text>
+				</View>
 			</View>
+
+			{/* Bouton Ajouter */}
+			<TouchableOpacity
+				style={[styles.button, { backgroundColor: colors.success }]}
+				onPress={handleSubmit}
+			>
+				<Text style={[styles.buttonText, { fontFamily: fontFamily.bold }]}>
+					Ajouter
+				</Text>
+			</TouchableOpacity>
 		</View>
 	);
 };
 
 export default AddCategory;
 
-
-// --- React Native Styles ---
 const styles = StyleSheet.create({
 	container: {
 		padding: 16,
-		backgroundColor: '#f9f9f9',
 		borderRadius: 8,
 		marginVertical: 10,
 	},
 	heading: {
 		fontSize: 18,
-		fontWeight: '600',
 		marginBottom: 12,
-		color: '#333',
-	},
-	inputGroup: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
 	},
 	input: {
 		borderWidth: 1,
-		borderColor: '#ccc',
-		padding: 10,
+		padding: 12,
 		borderRadius: 6,
 		fontSize: 16,
+		marginBottom: 12,
 	},
-	nameInput: {
+	modeToggle: {
+		flexDirection: 'row',
+		gap: 8,
+		marginBottom: 12,
+	},
+	modeButton: {
 		flex: 1,
+		paddingVertical: 10,
+		borderRadius: 6,
+		alignItems: 'center',
+		borderWidth: 1,
 	},
-	colorWrapper: {
+	modeButtonActive: {
+		// La couleur de fond est gérée dynamiquement
+	},
+	modeButtonText: {
+		fontSize: 14,
+		color: '#666',
+	},
+	modeButtonTextActive: {
+		color: '#FFF',
+	},
+	colorGrid: {
+		marginBottom: 12,
+	},
+	colorCircle: {
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		marginRight: 10,
+		justifyContent: 'center',
+		alignItems: 'center',
+		borderWidth: 2,
+		borderColor: 'transparent',
+	},
+	colorCircleSelected: {
+		borderColor: '#000',
+		borderWidth: 3,
+	},
+	checkmark: {
+		color: '#FFF',
+		fontSize: 24,
+		fontWeight: 'bold',
+		textShadowColor: 'rgba(0, 0, 0, 0.5)',
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 2,
+	},
+	customColorRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		borderWidth: 1,
-		borderColor: '#ccc',
 		borderRadius: 6,
-		paddingRight: 5,
+		padding: 8,
+		marginBottom: 12,
 	},
 	colorPreview: {
-		width: 30,
-		height: 30,
-		borderRadius: 4,
-		margin: 5,
+		width: 40,
+		height: 40,
+		borderRadius: 6,
+		marginRight: 10,
 		borderWidth: 1,
-		borderColor: '#eee',
+		borderColor: '#DDD',
 	},
 	colorInput: {
-		width: 80,
-		padding: 10,
+		flex: 1,
+		padding: 8,
 		fontSize: 16,
-		borderWidth: 0,
+	},
+	preview: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: 12,
+		gap: 10,
+	},
+	previewLabel: {
+		fontSize: 14,
+	},
+	previewTag: {
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+	},
+	previewText: {
+		color: '#FFF',
+		fontSize: 14,
 	},
 	button: {
-		backgroundColor: '#10B981',
-		paddingVertical: 10,
+		paddingVertical: 12,
 		paddingHorizontal: 16,
 		borderRadius: 6,
 		alignItems: 'center',
@@ -179,7 +337,6 @@ const styles = StyleSheet.create({
 	},
 	buttonText: {
 		color: 'white',
-		fontWeight: 'bold',
 		fontSize: 16,
 	},
 });

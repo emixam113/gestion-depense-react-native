@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-	View,
-	Text,
-	StyleSheet,
-	ScrollView,
-	RefreshControl,
-	ActivityIndicator,
-	Alert,
-	TouchableOpacity,
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    RefreshControl,
+    ActivityIndicator,
+    Alert,
+    TouchableOpacity,
+    Image,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getWithAuth, sendWithAuth } from "../services/Api";
@@ -15,436 +16,333 @@ import AddExpense from "../components/AddExpense";
 import ExpenseList from '../components/ExpenseList';
 import Graph from '../components/Graph';
 import AddCategory from '../components/AddCategory';
+import CategoryList from '../components/CategoryList';
 import { useAccessibility } from '../Context/Accessibility';
+import { useTheme } from '../Context/ThemeContext';
+import { useRouter } from 'expo-router'; // 🚀 CORRECTION : Utilisation de useRouter pour Expo Router
+import { StackNavigationProp } from '@react-navigation/stack'; // ❌ Cet import sera retiré si le typage n'est pas utilisé
+import StatsTabsSwipe from '../components/StatsTabsSwipe';
 
-// Import des types centralisés
 import type {
-	Category,
-	Expense,
-	CreateExpenseDto,
-	ExpenseFormData,
-	User
+    Category,
+    Expense,
+    CreateExpenseDto,
+    ExpenseFormData,
+    User
 } from '../Types';
 
-export default function Dashboard() {
-	const [expenses, setExpenses] = useState<Expense[]>([]);
-	const [categories, setCategories] = useState<Category[]>([]);
-	const [user, setUser] = useState<User | null>(null);
-	const [token, setToken] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
+const settingsIcon = require('../../assets/images/settings.png');
 
-	// ✅ Hook d'accessibilité
-	const { accessibleFont, toggleFont, isLoading: accessibilityLoading } = useAccessibility();
+const Dashboard: React.FC = () => {
+    const [expenses, setExpenses] = useState<Expense[]>([]); // ⚠️ Changé 'Expenses' en 'Expense'
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [user, setUser] = useState<User | null>(null);
+    const [token, setToken] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-	// Chargement des données depuis l'API
-	const loadData = useCallback(async () => {
-		try {
-			setRefreshing(true);
+    // 🚀 CORRECTION : Initialisation du router
+    const router = useRouter();
 
-			// Récupération du token
-			const storedToken = await AsyncStorage.getItem("token");
-			if (!storedToken) {
-				Alert.alert("Erreur", "Vous devez être connecté");
-				return;
-			}
-			setToken(storedToken);
+    const {
+        accessibleFont,
+        toggleFont,
+        isLoading: accessibilityLoading,
+        fontFamily
+    } = useAccessibility();
 
-			// Routes backend correctes
-			const [expensesData, categoriesData, userData] = await Promise.all([
-				getWithAuth<Expense[]>("/expenses/me"),
-				getWithAuth<Category[]>("/categories"),
-				getWithAuth<User>("/users/me").catch(err => {
-					console.error("❌ Erreur /users/me:", err.message);
-					return getWithAuth<User>("/auth/profile").catch(err2 => {
-						console.error("❌ Erreur /auth/profile:", err2.message);
-						return null;
-					});
-				}),
-			]);
+    // ⚠️ Correction : themePreference manquait dans ta déstructuration
+    const { colors, isDark, setThemePreference, themePreference, setUserId } = useTheme();
 
-			console.log("✅ Données chargées:", {
-				expenses: expensesData?.length || 0,
-				categories: categoriesData?.length || 0,
-				user: userData?.firstName
-			});
+    const handleToggleTheme = () => {
+        const cycle: Record<typeof themePreference, typeof themePreference> = {
+            'system': 'light',
+            'light': 'dark', // ⚠️ Correction : 'ligth' en 'light'
+            'dark': 'system'
+        };
+        setThemePreference(cycle[themePreference]);
+    };
 
-			setExpenses(expensesData || []);
-			setCategories(categoriesData || []);
-			setUser(userData || null);
-		} catch (error) {
-			console.error("❌ Erreur lors du chargement:", error);
-			Alert.alert("Erreur", "Impossible de charger les données");
-		} finally {
-			setLoading(false);
-			setRefreshing(false);
-		}
-	}, []);
+    const loadData = useCallback(async () => {
+        try {
+            setRefreshing(true);
 
-	// Chargement initial
-	useEffect(() => {
-		loadData();
-	}, [loadData]);
+            const storedToken = await AsyncStorage.getItem("token");
+            if (!storedToken) {
+                Alert.alert("Erreur", "Vous devez être connecté");
+                return; // ❌ Permet de sortir sans appeler setLoading(false)
+            }
+            setToken(storedToken);
 
-	// Ajout d'une nouvelle dépense
-	const handleAddExpense = async (formData: ExpenseFormData) => {
-		try {
-			const categoryObj = categories.find(cat => cat.name === formData.category);
 
-			if (!categoryObj) {
-				Alert.alert("Erreur", "Catégorie invalide");
-				return;
-			}
+            const [expensesData, categoriesData, userData] = await Promise.all([
+                getWithAuth<Expense[]>("/expenses/me").catch(err => {
+                    console.error("❌ Erreur /expenses/me:", err.message);
+                    return []; // Retourne un tableau vide en cas d'erreur
+                }),
+                getWithAuth<Category[]>("/categories").catch(err => {
+                    console.error("❌ Erreur /categories:", err.message);
+                    return []; // Retourne un tableau vide en cas d'erreur
+                }),
+                getWithAuth<User>("/users/me").catch(err => {
+                    console.error("❌ Erreur /users/me:", err.message);
+                    return getWithAuth<User>("/auth/profile").catch(err2 => {
+                        console.error("❌ Erreur /auth/profile:", err2.message);
+                        return null; // Retourne null si les deux échouent
+                    });
+                }),
+            ]);
 
-			const expenseData: CreateExpenseDto = {
-				label: formData.description,
-				amount: formData.amount,
-				type: formData.type,
-				categoryId: categoryObj.id,
-				date: new Date().toISOString(),
-			};
+            console.log("✅ Données chargées:", {
+                expenses: expensesData?.length || 0,
+                categories: categoriesData?.length || 0,
+                user: userData?.firstName
+            });
 
-			console.log("📤 Envoi de la dépense:", expenseData);
+            setExpenses(expensesData || []);
+            setCategories(categoriesData || []);
+            setUser(userData || null);
+        } catch (error) {
+            // ❌ Gère toute erreur non capturée par les Promise.catch
+            console.error("❌ Erreur lors du chargement:", error);
+            Alert.alert("Erreur", "Impossible de charger les données");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [setUserId, themePreference]); // Ajout de dépendances pour useCallback
 
-			const createdExpense = await sendWithAuth<Expense>(
-				"/expenses",
-				"POST",
-				expenseData
-			);
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
-			console.log("✅ Dépense créée:", createdExpense);
+    useEffect(() => {
+        if (user?.id) {
+            setUserId(user.id.toString());
+            console.log("👤 User ID défini pour les préférences de thème:", user.id);
+        }
+    }, [user, setUserId]);
 
-			setExpenses((prev) => [createdExpense, ...prev]);
-			Alert.alert("Succès", "Transaction ajoutée avec succès");
-		} catch (error: any) {
-			console.error("❌ Erreur ajout dépense:", error.message);
-			Alert.alert("Erreur", "Impossible d'ajouter la transaction");
-		}
-	};
+    const handleAddExpense = async (formData: ExpenseFormData) => {
+        try {
+            const categoryObj = categories.find(cat => cat.name === formData.category);
 
-	// Suppression d'une dépense
-	const handleDeleteSuccess = (expenseId: number) => {
-		console.log("🗑️ Suppression de la dépense:", expenseId);
-		setExpenses((prev) => prev.filter((exp) => exp.id !== expenseId));
-	};
+            if (!categoryObj) {
+                Alert.alert("Erreur", "Catégorie invalide");
+                return;
+            }
 
-	// Callback après ajout de catégorie
-	const handleCategoryAdded = (newCategory: Category) => {
-		console.log("✅ Nouvelle catégorie:", newCategory);
-		setCategories((prev) => [...prev, newCategory]);
-		Alert.alert("Succès", `Catégorie "${newCategory.name}" ajoutée`);
-	};
+            const expenseData: CreateExpenseDto = {
+                label: formData.description,
+                amount: formData.amount,
+                type: formData.type,
+                categoryId: categoryObj.id,
+                date: new Date().toISOString(),
+            };
 
-	// Calcul du solde
-	const calculateBalance = (): number => {
-		if (!expenses || expenses.length === 0) {
-			return 0;
-		}
+            console.log("📤 Envoi de la dépense:", expenseData);
 
-		try {
-			const balance = expenses.reduce((acc, expense) => {
-				const amount = parseFloat(expense.amount) || 0;
-				return acc + amount;
-			}, 0);
+            const createdExpense = await sendWithAuth<Expense>(
+                "/expenses",
+                "POST",
+                expenseData
+            );
 
-			return balance;
-		} catch (error) {
-			console.error("❌ Erreur calcul solde:", error);
-			return 0;
-		}
-	};
+            console.log("✅ Dépense créée:", createdExpense);
 
-	// Calcul des totaux par catégorie pour le Graph
-	const calculateCategoryTotals = () => {
-		const revenus: Record<string, number> = {};
-		const depenses: Record<string, number> = {};
-		const categoryColors: Record<string, string> = {};
+            setExpenses((prev) => [createdExpense, ...prev]);
+            Alert.alert("Succès", "Transaction ajoutée avec succès");
+        } catch (error: any) {
+            console.error("Erreur ajout dépense:", error.message);
+            Alert.alert("Erreur", "Impossible d'ajouter la transaction");
+        }
+    };
 
-		if (!expenses || expenses.length === 0) {
-			return { revenus, depenses, categoryColors };
-		}
+    const handleDeleteSuccess = (expenseId: number) => {
+        console.log("🗑️ Suppression de la dépense:", expenseId);
+        setExpenses((prev) => prev.filter((exp) => exp.id !== expenseId));
+    };
 
-		expenses.forEach((expense) => {
-			if (!expense.category) return;
+    const handleCategoryAdded = (newCategory: Category) => {
+        console.log("✅ Nouvelle catégorie:", newCategory);
+        setCategories((prev) => [...prev, newCategory]);
+        Alert.alert("Succès", `Catégorie "${newCategory.name}" ajoutée`);
+    };
 
-			const categoryName = expense.category.name;
-			const amount = Math.abs(parseFloat(expense.amount)) || 0;
+    const calculateBalance = (): number => {
+        if (!expenses || expenses.length === 0) return 0;
 
-			categoryColors[categoryName] = expense.category.color;
+        return expenses.reduce((acc, expense) => {
+            const amount = Math.abs(parseFloat(expense.amount)) || 0;
+            return expense.type === "expense" ? acc - amount : acc + amount;
+        }, 0);
+    };
 
-			if (expense.type === "income") {
-				revenus[categoryName] = (revenus[categoryName] || 0) + amount;
-			} else {
-				depenses[categoryName] = (depenses[categoryName] || 0) + amount;
-			}
-		});
+    const calculateCategoryTotals = () => {
+        const revenus: Record<string, number> = {};
+        const depenses: Record<string, number> = {};
+        const categoryColors: Record<string, string> = {};
 
-		return { revenus, depenses, categoryColors };
-	};
+        expenses.forEach((expense) => {
+            const categoryName = expense.category?.name;
+            if (!categoryName) return;
 
-	const { revenus, depenses, categoryColors } = calculateCategoryTotals();
-	const balance = calculateBalance();
+            const amount = Math.abs(parseFloat(expense.amount)) || 0;
+            categoryColors[categoryName] = expense.category?.color || '#000000';
 
-	if (loading || accessibilityLoading) {
-		return (
-			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#28A745" />
-				<Text style={[
-					styles.loadingText,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_400Regular' }
-				]}>
-					Chargement...
-				</Text>
-			</View>
-		);
-	}
+            if (expense.type === "income") {
+                revenus[categoryName] = (revenus[categoryName] || 0) + amount;
+            } else {
+                depenses[categoryName] = (depenses[categoryName] || 0) + amount;
+            }
+        });
 
-	return (
-		<ScrollView
-			style={styles.container}
-			refreshControl={
-				<RefreshControl refreshing={refreshing} onRefresh={loadData} />
-			}
-		>
-			{/* En-tête utilisateur */}
-			<View style={styles.header}>
-				<View style={styles.headerTop}>
-					<Text style={[
-						styles.welcomeText,
-						{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_700Bold' },
-						accessibleFont && { fontWeight: 'bold' }
-					]}>
-						Bonjour {user?.firstName || "Utilisateur"} 👋
-					</Text>
+        return { revenus, depenses, categoryColors };
+    };
 
-					{/* Bouton Toggle Accessibilité */}
-					<TouchableOpacity
-						style={[styles.toggleButton, accessibleFont && styles.toggleButtonActive]}
-						onPress={toggleFont}
-						accessibilityLabel="Activer ou désactiver la police accessible Atkinson Hyperlegible"
-						accessibilityRole="button"
-					>
-						<Text style={[
-							styles.toggleButtonText,
-							accessibleFont && styles.toggleButtonTextActive,
-							{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_600SemiBold' }
-						]}>
-							{accessibleFont ? 'A+' : 'A'}
-						</Text>
-					</TouchableOpacity>
-				</View>
+    const balance = useMemo(() => calculateBalance(), [expenses]);
+    const { revenus, depenses, categoryColors } = useMemo(() => calculateCategoryTotals(), [expenses]);
 
-				<Text style={[
-					styles.balanceLabel,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_400Regular' }
-				]}>
-					Solde actuel
-				</Text>
-				<Text style={[
-					styles.balanceAmount,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_700Bold' },
-					accessibleFont && { fontWeight: 'bold' }
-				]}>
-					{balance.toFixed(2)} €
-				</Text>
-			</View>
+    if (loading || accessibilityLoading) {
+        return (
+            <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { fontFamily: fontFamily.regular, color: colors.text }]}>
+                    Chargement...
+                </Text>
+            </View>
+        );
+    }
 
-			{/* Bloc de test des polices */}
-			<View style={styles.testBlock}>
-				<Text style={[
-					styles.testTitle,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_600SemiBold' },
-					accessibleFont && { fontWeight: 'bold' }
-				]}>
-					Test de police : 0O Il1 2025
-				</Text>
-				<Text style={[
-					styles.testDescription,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_400Regular' }
-				]}>
-					Police active : {accessibleFont ? 'Atkinson Hyperlegible ✓' : 'Poppins'}
-				</Text>
-				<Text style={[
-					styles.testHint,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_400Regular' }
-				]}>
-					{accessibleFont
-						? '→ Le 0 devrait être barré (Ø) en Atkinson'
-						: '→ Cliquez sur A+ pour activer Atkinson'}
-				</Text>
-			</View>
+    return (
+        <ScrollView
+            style={[styles.container, { backgroundColor: colors.background }]}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={loadData}
+                    tintColor={isDark ? colors.text : colors.primary}
+                />
+            }
+        >
+            {/* HEADER */}
+            <View style={[styles.header, { backgroundColor: colors.primary }]}>
+                <View style={styles.headerTop}>
+                    <Text style={[styles.welcomeText, { fontFamily: fontFamily.bold }]}>
+                        Bonjour {user?.firstName || "Utilisateur"}
+                    </Text>
 
-			{/* Graphique */}
-			{expenses.length > 0 && (
-				<View style={styles.section}>
-					<Text style={[
-						styles.sectionTitle,
-						{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_600SemiBold' },
-						accessibleFont && { fontWeight: 'bold' }
-					]}>
-						📊 Statistiques
-					</Text>
-					<Graph
-						revenus={revenus}
-						depenses={depenses}
-						categoryColors={categoryColors}
-					/>
-				</View>
-			)}
+                    <View style={styles.toggleContainer}>
+                        {/* THEME */}
+                        <TouchableOpacity
+                            style={[styles.toggleButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}
+                            onPress={handleToggleTheme}
+                        >
+                            <Text style={[styles.toggleButtonText, { fontFamily: fontFamily.semiBold, color: isDark ? colors.surface : '#FFF' }]}>
+                                {themePreference === 'system' ? '🔄' : isDark ? '☀️' : '🌙'}
+                            </Text>
+                        </TouchableOpacity>
 
-			{/* Ajout de catégorie */}
-			<View style={styles.section}>
-				<AddCategory
-					token={token}
-					onCategoryAdded={handleCategoryAdded}
-				/>
-			</View>
+                        {/* ACCESSIBILITÉ */}
+                        <TouchableOpacity
+                            style={[styles.toggleButton, accessibleFont ? { backgroundColor: isDark ? colors.surface : '#FFF' } : {}]}
+                            onPress={toggleFont}
+                        >
+                            <Text style={[styles.toggleButtonText, accessibleFont ? { color: colors.primary } : { color: isDark ? colors.surface : '#FFF' }, { fontFamily: fontFamily.semiBold }]}>
+                                {accessibleFont ? 'A+' : 'A'}
+                            </Text>
+                        </TouchableOpacity>
 
-			{/* Formulaire d'ajout de dépense */}
-			<View style={styles.section}>
-				<AddExpense
-					categories={categories.map(cat => cat.name)}
-					onAdd={handleAddExpense}
-				/>
-			</View>
+                        {/* SETTINGS (CORRIGÉ) */}
+                        <TouchableOpacity
+                            style={[styles.toggleButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)' }]}
+                            onPress={() => router.push('/screens/Settings')} // 🚀 CORRECTION : Utilisation de router.push pour Settings
+                        >
+                            <Image
+                                source={settingsIcon}
+                                style={{ width: 24, height: 24, tintColor: isDark ? colors.surface : '#FFF' }}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
-			{/* Liste des dépenses */}
-			<View style={styles.section}>
-				<Text style={[
-					styles.sectionTitle,
-					{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_600SemiBold' },
-					accessibleFont && { fontWeight: 'bold' }
-				]}>
-					💳 Dernières transactions ({expenses.length})
-				</Text>
-				{expenses.length === 0 ? (
-					<Text style={[
-						styles.emptyText,
-						{ fontFamily: accessibleFont ? 'Atkinson-Regular' : 'Poppins_400Regular' }
-					]}>
-						Aucune transaction pour le moment. Commencez par ajouter une dépense ! 🎯
-					</Text>
-				) : (
-					<ExpenseList
-						expenses={expenses}
-						onDeleteSuccess={handleDeleteSuccess}
-					/>
-				)}
-			</View>
-		</ScrollView>
-	);
-}
+                <Text style={[styles.balanceLabel, { fontFamily: fontFamily.regular }]}>
+                    Solde actuel
+                </Text>
+                <Text style={[styles.balanceAmount, { fontFamily: fontFamily.bold }]}>
+                    {balance.toFixed(2)} €
+                </Text>
+            </View>
+
+            {/* GRAPH */}
+            {expenses.length > 0 && (
+                <View style={[styles.section, { backgroundColor: colors.cardBackground }]}>
+                    <Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
+                        📊 Statistiques
+                    </Text>
+                    <StatsTabsSwipe
+                                revenus={revenus}
+                                depenses={depenses}
+                                categoryColors={categoryColors}
+                                expenses={expenses}
+                    />
+                </View>
+            )}
+
+            {/* AJOUTER UNE CATEGORY */}
+            <View style={[styles.section, { backgroundColor: colors.cardBackground }]}>
+                <AddCategory token={token} onCategoryAdded={handleCategoryAdded} />
+            </View>
+
+            {/* LISTE CATEGORY */}
+            <View style={[styles.section, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
+                    📁 Catégories ({categories.length})
+                </Text>
+                <CategoryList
+                    token={token}
+                    onDeleteCategory={(id) => {
+                        setCategories((prev) => prev.filter((cat) => cat.id !== id));
+                        console.log("🗑️ Catégorie supprimée:", id);
+                    }}
+                />
+            </View>
+
+            {/* AJOUT EXPENSE */}
+            <View style={[styles.section, { backgroundColor: colors.cardBackground }]}>
+                <AddExpense categories={categories.map(cat => cat.name)} onAdd={handleAddExpense} />
+            </View>
+
+            {/* EXPENSE LIST */}
+            <View style={[styles.section, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
+                    💳 Dernières transactions ({expenses.length})
+                </Text>
+                <ExpenseList
+                    expenses={expenses}
+                    onDeleteSuccess={handleDeleteSuccess}
+                    onEditSuccess={(updated) => setExpenses((prev) => prev.map((exp) => exp.id === updated.id ? updated : exp))}
+                    token={token}
+                />
+            </View>
+        </ScrollView>
+    );
+};
+
+export default Dashboard;
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "#EAF7EF",
-	},
-	loadingContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#EAF7EF",
-	},
-	loadingText: {
-		marginTop: 10,
-		fontSize: 16,
-		color: "#666",
-	},
-	header: {
-		backgroundColor: "#28A745",
-		padding: 20,
-		paddingTop: 60,
-		borderBottomLeftRadius: 20,
-		borderBottomRightRadius: 20,
-	},
-	headerTop: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "flex-start",
-		marginBottom: 10,
-	},
-	welcomeText: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: "#FFF",
-		flex: 1,
-	},
-	toggleButton: {
-		backgroundColor: "rgba(255, 255, 255, 0.3)",
-		paddingVertical: 8,
-		paddingHorizontal: 12,
-		borderRadius: 8,
-		marginLeft: 10,
-		minWidth: 40,
-		alignItems: "center",
-	},
-	toggleButtonActive: {
-		backgroundColor: "#FFF",
-	},
-	toggleButtonText: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#FFF",
-	},
-	toggleButtonTextActive: {
-		color: "#28A745",
-	},
-	balanceLabel: {
-		fontSize: 14,
-		color: "#E3F2FD",
-		marginBottom: 5,
-	},
-	balanceAmount: {
-		fontSize: 36,
-		fontWeight: "bold",
-		color: "#FFF",
-	},
-	testBlock: {
-		backgroundColor: "#FFF9E6",
-		margin: 15,
-		padding: 15,
-		borderRadius: 10,
-		borderLeftWidth: 4,
-		borderLeftColor: "#FFC107",
-	},
-	testTitle: {
-		fontSize: 20,
-		color: "#333",
-		marginBottom: 8,
-	},
-	testDescription: {
-		fontSize: 14,
-		color: "#666",
-		marginBottom: 4,
-	},
-	testHint: {
-		fontSize: 12,
-		color: "#999",
-		fontStyle: "italic",
-	},
-	section: {
-		backgroundColor: "#FFF",
-		margin: 15,
-		padding: 15,
-		borderRadius: 10,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 15,
-	},
-	emptyText: {
-		textAlign: "center",
-		color: "#888",
-		fontSize: 14,
-		fontStyle: "italic",
-		paddingVertical: 20,
-	},
+    container: { flex: 1 },
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+    loadingText: { marginTop: 10, fontSize: 16 },
+    header: { padding: 20, paddingTop: 60, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
+    headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 },
+    welcomeText: { fontSize: 24, color: "#FFF", flex: 1 },
+    toggleContainer: { flexDirection: "row" },
+    toggleButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, minWidth: 40, alignItems: "center", marginRight: 8 },
+    toggleButtonText: { fontSize: 16 },
+    balanceLabel: { fontSize: 14, color: "#E3F2FD", marginBottom: 5 },
+    balanceAmount: { fontSize: 36, color: "#FFF" },
+    section: { margin: 15, padding: 15, borderRadius: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+    sectionTitle: { fontSize: 18, marginBottom: 15 },
 });
