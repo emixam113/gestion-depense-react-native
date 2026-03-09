@@ -11,13 +11,13 @@ import {
 import { Category } from '../Types/category';
 import { useTheme } from '../Context/ThemeContext';
 import { useAccessibility } from '../Context/Accessibility';
+import {API_URL} from '../services/Api';
 
 interface Props {
 	token: string | null;
 	onCategoryAdded?: (category: Category) => void;
 }
 
-const BASE_API_URL = "http://192.168.1.39:3000";
 
 // Couleurs prédéfinies
 const PRESET_COLORS = [
@@ -57,7 +57,7 @@ const AddCategory: React.FC<Props> = ({ token, onCategoryAdded }) => {
 		}
 
 		try {
-			const res = await fetch(`${BASE_API_URL}/categories`, {
+			const res = await fetch(`${API_URL}/categories`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",

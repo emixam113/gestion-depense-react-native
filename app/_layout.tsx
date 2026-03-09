@@ -2,53 +2,91 @@ import { AccessibilityProvider } from './Context/Accessibility';
 import { ThemeProvider } from './Context/ThemeContext';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack } from 'expo-router';
-import { NotificationService } from './services/NotificationService';
+import * as Notifications from 'expo-notifications';
+import {
+  initNotifications,
+  scheduleMonthlyReport,
+  checkInactivity,
+  scheduleInactivityReminder,
+  addNotificationListeners,
+} from './services/NotificationService';
+
+// ─── Handler foreground — SDK 53+ ────────────────────────────
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,   // ← SDK 53+ (remplace shouldShowAlert)
+    shouldShowList: true,     // ← SDK 53+
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-    const [fontsLoaded] = useFonts({
-       'Atkinson-Regular': require('../assets/fonts/AtkinsonHyperlegible-Regular.ttf'),
-       'Atkinson-Bold': require('../assets/fonts/AtkinsonHyperlegible-Bold.ttf')
-    });
+  const [fontsLoaded] = useFonts({
+    'Atkinson-Regular': require('../assets/fonts/AtkinsonHyperlegible-Regular.ttf'),
+    'Atkinson-Bold': require('../assets/fonts/AtkinsonHyperlegible-Bold.ttf'),
+  });
 
-    // Gestion du Splash Screen
-    useEffect(() => {
-       if (fontsLoaded) {
-          SplashScreen.hideAsync();
-       }
-    }, [fontsLoaded]);
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
 
-    // --- INITIALISATION DES NOTIFICATIONS ---
-    useEffect(() => {
-        const setupNotifications = async () => {
-            // Demande la permission à l'utilisateur
-            const hasPermission = await NotificationService.requestPermissions();
+  useEffect(() => {
+    async function setup() {
+      try {
+        // 1. Initialiser les permissions + canaux Android
+        await initNotifications();
 
-            if (hasPermission) {
-                // Configure un rappel quotidien par défaut à 20h00
-                // Tu pourras plus tard rendre cela réglable dans les paramètres
-                await NotificationService.scheduleDailyReminder(20, 0);
-                console.log("Notifications configurées avec succès !");
-            } else {
-                console.log("Permissions de notification refusées.");
-            }
-        };
+        // 2. Planifier le rapport mensuel (1er du mois à 9h)
+        await scheduleMonthlyReport();
 
-        setupNotifications();
-    }, []);
+        // 3. Vérifier l'inactivité et planifier le rappel
+        await checkInactivity(3);
+        await scheduleInactivityReminder(3);
 
- if (!fontsLoaded) {
-       return null;
- }
+        // 4. Reset des alertes budget le 1er du mois
+        const today = new Date();
+        if (today.getDate() === 1) {
+          const { resetBudgetAlerts } = await import('./services/NotificationService');
+          await resetBudgetAlerts();
+        }
 
-    return (
-       <ThemeProvider>
-          <AccessibilityProvider>
-             <Stack />
-          </AccessibilityProvider>
-       </ThemeProvider>
-    );
+      } catch (error) {
+        console.warn('[Notifications] Erreur initialisation:', error);
+      }
+    }
+    setup();
+  }, []);
+
+  useEffect(() => {
+    // Listeners — notif reçue en foreground
+    const onReceive = (notification: Notifications.Notification) => {
+      console.log('[Notif reçue]', notification.request.content.title);
+    };
+
+    // Listener — utilisateur tape sur une notif
+    const onResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data;
+      console.log('[Notif tapée]', data);
+      // Vous pouvez ajouter une navigation ici selon data.type
+      // ex: if (data.type === 'budget_exceeded') router.push('/(tabs)/stats');
+    };
+
+    const cleanup = addNotificationListeners(onReceive, onResponse);
+    return cleanup;
+  }, []);
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <ThemeProvider>
+      <AccessibilityProvider>
+        <Stack />
+      </AccessibilityProvider>
+    </ThemeProvider>
+  );
 }
