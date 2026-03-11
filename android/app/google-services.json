@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "679995657047",
+    "project_id": "fineo-e2665",
+    "storage_bucket": "fineo-e2665.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:679995657047:android:9c87db3fc6d952e7d70c12",
+        "android_client_info": {
+          "package_name": "com.anonymous.gestion-depense"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAsxbvozAhnxNUh_z6K4Ma2RDZ9FAiwehk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
