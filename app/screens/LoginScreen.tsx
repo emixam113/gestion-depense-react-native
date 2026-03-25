@@ -7,16 +7,15 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { login, registerPushToken } from "../services/Api";
 import { getPushToken, initNotifications } from "../services/NotificationService";
 
 const logo = require("../../assets/images/logo.png");
 const eyeVisible = require("../../assets/images/Vector.png");
-const eyeHidden = require('../../assets/images/Eye-Pass.png');
+const eyeHidden = require("../../assets/images/Eye-Pass.png");
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -33,29 +32,25 @@ const LoginScreen = () => {
 
     setIsLoading(true);
     try {
-      const authData = await login(email, password);
+      // ✅ Api.tsx gère déjà le stockage du token et du user
+      await login(email, password);
 
-      await AsyncStorage.setItem("user", JSON.stringify(authData.user));
-      await AsyncStorage.setItem("token", authData.access_token);
-
-      // ── Enregistrement du token push après login réussi ──────────
+      // ✅ Enregistrement du token push après login réussi
       try {
-        await initNotifications(); // Demande les permissions si pas encore fait
+        await initNotifications();
         const pushToken = await getPushToken();
-        if (pushToken) {
-          await registerPushToken(pushToken);
-        }
-      } catch (pushError) {
+        if (pushToken) await registerPushToken(pushToken);
+      } catch {
         // Ne pas bloquer la navigation si les notifs échouent
-        console.warn('[Push] Erreur enregistrement token:', pushError);
       }
-      // ─────────────────────────────────────────────────────────────
 
       Alert.alert("Succès", "Connexion réussie !");
       router.replace("/(tabs)");
     } catch (err) {
-      console.error("Erreur login:", err);
-      const errorMessage = err instanceof Error ? err.message : "Impossible de se connecter au serveur";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Impossible de se connecter au serveur.";
       Alert.alert("Erreur", errorMessage);
     } finally {
       setIsLoading(false);
@@ -95,7 +90,9 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          >
             <Image
               source={isPasswordVisible ? eyeVisible : eyeHidden}
               style={styles.eyeIcon}
@@ -113,6 +110,14 @@ const LoginScreen = () => {
           ) : (
             <Text style={styles.buttonText}>Se Connecter</Text>
           )}
+        </TouchableOpacity>
+
+        {/* ✅ Lien mot de passe oublié */}
+        <TouchableOpacity
+          onPress={() => router.push("/screens/Forgot-Password")}
+          style={styles.forgotPassword}
+        >
+          <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
         </TouchableOpacity>
       </View>
 
@@ -141,6 +146,8 @@ const styles = StyleSheet.create({
   eyeIcon: { width: 20, height: 20, marginLeft: 10 },
   loginButton: { width: "60%", alignSelf: "center", backgroundColor: "#8BC34A", padding: 12, borderRadius: 50, alignItems: "center", marginTop: 20 },
   buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  forgotPassword: { alignSelf: "center", marginTop: 12 },
+  forgotPasswordText: { color: "#28A745", fontWeight: "bold", fontSize: 14 },
   signupTextContainer: { flexDirection: "row", marginTop: 40 },
   signupText: { color: "#333" },
   signupLink: { color: "#28A745", fontWeight: "bold" },
