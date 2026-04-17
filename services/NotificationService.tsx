@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -8,17 +9,31 @@ import Constants from 'expo-constants';
 const KEYS = {
   LAST_EXPENSE_DATE: 'last_expense_date',
   BUDGET_ALERT_SENT: 'budget_alert_sent_',
+  BUDGET_ALERT_KEYS: 'budget_alert_keys',
   MONTHLY_REPORT_ID: 'monthly_report_notif_id',
   INACTIVITY_ID: 'inactivity_notif_id',
   PUSH_TOKEN: 'push_token',
+  COMPARISON_EXPENSES_UP: 'comparison_notif_expenses_up_',
+  COMPARISON_REVENUES_DOWN: 'comparison_notif_revenues_down_',
+  COMPARISON_EXPENSES_DOWN: 'comparison_notif_expenses_down_',
+};
+
+const monthKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()}`;
 };
 
 // ════════════════════════════════════════════════════════════════
 // 1. INITIALISATION & PERMISSIONS
 // ════════════════════════════════════════════════════════════════
 export async function initNotifications(): Promise<string | null> {
+<<<<<<< HEAD:services/NotificationService.tsx
   if (!Device.isDevice && Platform.OS === 'ios') {
     console.warn('[Notifications] Simulateur iOS détecté — notifications désactivées');
+=======
+  // ✅ Bloque uniquement le simulateur iOS, pas l'émulateur Android
+  if (!Device.isDevice && Platform.OS === 'ios') {
+>>>>>>> origin/main:app/services/NotificationService.tsx
     return null;
   }
 
@@ -31,7 +46,6 @@ export async function initNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== 'granted') {
-    console.warn('[Notifications] Permission refusée');
     return null;
   }
 
@@ -58,13 +72,25 @@ export async function initNotifications(): Promise<string | null> {
 
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+<<<<<<< HEAD:services/NotificationService.tsx
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+=======
+    const tokenData = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+
+>>>>>>> origin/main:app/services/NotificationService.tsx
     const token = tokenData.data;
     await AsyncStorage.setItem(KEYS.PUSH_TOKEN, token);
-    console.log('[Notifications] Token push:', token);
+    // ✅ Log temporaire pour debug — à supprimer après validation
+    console.log('🔔 Push token:', token);
     return token;
   } catch (e) {
+<<<<<<< HEAD:services/NotificationService.tsx
     console.warn('[Notifications] Token push non disponible:', e);
+=======
+    console.log('❌ Erreur token push:', e);
+>>>>>>> origin/main:app/services/NotificationService.tsx
     return null;
   }
 }
@@ -74,7 +100,7 @@ export async function getPushToken(): Promise<string | null> {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 2. ALERTES BUDGET (80% et 100%)
+// 2. ALERTES BUDGET (local quand app ouverte)
 // ════════════════════════════════════════════════════════════════
 interface BudgetAlertParams {
   categoryName: string;
@@ -99,7 +125,7 @@ export async function checkBudgetAlert(params: BudgetAlertParams): Promise<void>
         channelId: 'budget',
         data: { type: 'budget_alert', categoryId, level: 80 },
       });
-      await AsyncStorage.setItem(key80, 'true');
+      await saveBudgetAlertKey(key80);
     }
   }
 
@@ -113,20 +139,39 @@ export async function checkBudgetAlert(params: BudgetAlertParams): Promise<void>
         channelId: 'budget',
         data: { type: 'budget_alert', categoryId, level: 100 },
       });
-      await AsyncStorage.setItem(key100, 'true');
+      await saveBudgetAlertKey(key100);
     }
   }
 }
 
+async function saveBudgetAlertKey(key: string): Promise<void> {
+  await AsyncStorage.setItem(key, 'true');
+  const raw = await AsyncStorage.getItem(KEYS.BUDGET_ALERT_KEYS);
+  const keys: string[] = raw ? JSON.parse(raw) : [];
+  if (!keys.includes(key)) {
+    keys.push(key);
+    await AsyncStorage.setItem(KEYS.BUDGET_ALERT_KEYS, JSON.stringify(keys));
+  }
+}
+
 export async function resetBudgetAlerts(): Promise<void> {
+<<<<<<< HEAD:services/NotificationService.tsx
   const allKeys = await AsyncStorage.getAllKeys();
   const budgetKeys = allKeys.filter((k) => k.startsWith(KEYS.BUDGET_ALERT_SENT));
   if (budgetKeys.length > 0) await AsyncStorage.multiRemove(budgetKeys);
   console.log('[Notifications] Alertes budget réinitialisées');
+=======
+  const raw = await AsyncStorage.getItem(KEYS.BUDGET_ALERT_KEYS);
+  const keys: string[] = raw ? JSON.parse(raw) : [];
+  if (keys.length > 0) {
+    await AsyncStorage.multiRemove(keys);
+    await AsyncStorage.removeItem(KEYS.BUDGET_ALERT_KEYS);
+  }
+>>>>>>> origin/main:app/services/NotificationService.tsx
 }
 
 // ════════════════════════════════════════════════════════════════
-// 3. RAPPORT MENSUEL AUTOMATIQUE
+// 3. RAPPORT MENSUEL
 // ════════════════════════════════════════════════════════════════
 export async function scheduleMonthlyReport(): Promise<void> {
   await cancelMonthlyReport();
@@ -152,9 +197,12 @@ export async function scheduleMonthlyReport(): Promise<void> {
   });
 
   await AsyncStorage.setItem(KEYS.MONTHLY_REPORT_ID, id);
+<<<<<<< HEAD:services/NotificationService.tsx
   console.log(
     `[Notifications] Rapport mensuel planifié pour le ${nextMonth.toLocaleDateString('fr-FR')}`,
   );
+=======
+>>>>>>> origin/main:app/services/NotificationService.tsx
 }
 
 export async function sendMonthlyReportNow(params: {
@@ -188,6 +236,7 @@ export async function cancelMonthlyReport(): Promise<void> {
 // ════════════════════════════════════════════════════════════════
 export async function recordExpenseActivity(): Promise<void> {
   await AsyncStorage.setItem(KEYS.LAST_EXPENSE_DATE, new Date().toISOString());
+  await cancelInactivityReminder();
   await scheduleInactivityReminder(3);
 }
 
@@ -211,7 +260,6 @@ export async function scheduleInactivityReminder(daysThreshold: number = 3): Pro
   });
 
   await AsyncStorage.setItem(KEYS.INACTIVITY_ID, id);
-  console.log(`[Notifications] Rappel inactivité dans ${daysThreshold} jours`);
 }
 
 export async function checkInactivity(daysThreshold: number = 3): Promise<void> {
@@ -219,7 +267,12 @@ export async function checkInactivity(daysThreshold: number = 3): Promise<void> 
   if (!lastDateStr) return;
 
   const diffDays = Math.floor(
+<<<<<<< HEAD:services/NotificationService.tsx
     (new Date().getTime() - new Date(lastDateStr).getTime()) / (1000 * 60 * 60 * 24),
+=======
+    (new Date().getTime() - new Date(lastDateStr).getTime()) /
+      (1000 * 60 * 60 * 24),
+>>>>>>> origin/main:app/services/NotificationService.tsx
   );
 
   if (diffDays >= daysThreshold) {
@@ -241,19 +294,8 @@ export async function cancelInactivityReminder(): Promise<void> {
 }
 
 // ════════════════════════════════════════════════════════════════
-// 5. NOTIFICATIONS COMPARAISON MENSUELLE
+// 5. COMPARAISON MENSUELLE (local quand app ouverte)
 // ════════════════════════════════════════════════════════════════
-const KEYS_COMPARISON = {
-  EXPENSES_UP: 'comparison_notif_expenses_up_',
-  REVENUES_DOWN: 'comparison_notif_revenues_down_',
-  EXPENSES_DOWN: 'comparison_notif_expenses_down_',
-};
-
-const monthKey = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${now.getMonth()}`;
-};
-
 interface ComparisonNotifParams {
   changeDepenses: number;
   changeRevenus: number;
@@ -268,7 +310,11 @@ export async function checkComparisonNotifications(
   const mk = monthKey();
 
   if (changeDepenses >= 20 && currentDepenses > 0) {
+<<<<<<< HEAD:services/NotificationService.tsx
     const key = KEYS_COMPARISON.EXPENSES_UP + mk;
+=======
+    const key = KEYS.COMPARISON_EXPENSES_UP + mk;
+>>>>>>> origin/main:app/services/NotificationService.tsx
     if (!(await AsyncStorage.getItem(key).catch(() => null))) {
       await sendLocalNotification({
         title: '📈 Vos dépenses augmentent !',
@@ -281,7 +327,11 @@ export async function checkComparisonNotifications(
   }
 
   if (changeRevenus < -10 && currentRevenus > 0) {
+<<<<<<< HEAD:services/NotificationService.tsx
     const key = KEYS_COMPARISON.REVENUES_DOWN + mk;
+=======
+    const key = KEYS.COMPARISON_REVENUES_DOWN + mk;
+>>>>>>> origin/main:app/services/NotificationService.tsx
     if (!(await AsyncStorage.getItem(key).catch(() => null))) {
       await sendLocalNotification({
         title: '💰 Vos revenus sont en baisse',
@@ -294,7 +344,11 @@ export async function checkComparisonNotifications(
   }
 
   if (changeDepenses < -10 && currentDepenses > 0) {
+<<<<<<< HEAD:services/NotificationService.tsx
     const key = KEYS_COMPARISON.EXPENSES_DOWN + mk;
+=======
+    const key = KEYS.COMPARISON_EXPENSES_DOWN + mk;
+>>>>>>> origin/main:app/services/NotificationService.tsx
     if (!(await AsyncStorage.getItem(key).catch(() => null))) {
       await sendLocalNotification({
         title: '🎉 Bravo, vous économisez !',
@@ -318,7 +372,13 @@ interface LocalNotificationParams {
   delaySeconds?: number;
 }
 
+<<<<<<< HEAD:services/NotificationService.tsx
 export async function sendLocalNotification(params: LocalNotificationParams): Promise<string> {
+=======
+async function sendLocalNotification(
+  params: LocalNotificationParams,
+): Promise<string> {
+>>>>>>> origin/main:app/services/NotificationService.tsx
   const { title, body, channelId = 'default', data = {}, delaySeconds } = params;
 
   return Notifications.scheduleNotificationAsync({
@@ -335,7 +395,6 @@ export async function sendLocalNotification(params: LocalNotificationParams): Pr
 
 export async function cancelAllNotifications(): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  console.log('[Notifications] Toutes les notifications annulées');
 }
 
 export function addNotificationListeners(

@@ -7,16 +7,21 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+<<<<<<< HEAD
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { login, registerPushToken } from "../../services/Api";
 import { getPushToken, initNotifications } from "../../services/NotificationService";
+=======
+import { login, registerPushToken } from "../services/Api";
+import { getPushToken, initNotifications } from "../services/NotificationService";
+>>>>>>> origin/main
 
 const logo = require("../../assets/images/logo.png");
 const eyeVisible = require("../../assets/images/Vector.png");
-const eyeHidden = require('../../assets/images/Eye-Pass.png');
+const eyeHidden = require("../../assets/images/Eye-Pass.png");
 
 const LoginScreen = () => {
   const [email, setEmail] = useState("");
@@ -36,6 +41,7 @@ const LoginScreen = () => {
     console.log("🚀 Tentative de connexion pour :", email);
 
     try {
+<<<<<<< HEAD
       // 2. Appel à ton service API (ton propre backend)
       const authData = await login(email, password);
       console.log("✅ Serveur a répondu :", authData);
@@ -60,10 +66,23 @@ const LoginScreen = () => {
         }
       } catch (pushError) {
         console.warn('[Push] Erreur non bloquante :', pushError);
+=======
+      // ✅ Api.tsx gère déjà le stockage du token et du user
+      await login(email, password);
+
+      // ✅ Enregistrement du token push après login réussi
+      try {
+        await initNotifications();
+        const pushToken = await getPushToken();
+        if (pushToken) await registerPushToken(pushToken);
+      } catch {
+        // Ne pas bloquer la navigation si les notifs échouent
+>>>>>>> origin/main
       }
 
       // 5. Navigation vers l'app
       Alert.alert("Succès", "Connexion réussie !");
+<<<<<<< HEAD
       router.replace("/(tabs)/Dashboard");
 
     } catch (err: any) {
@@ -83,6 +102,15 @@ const LoginScreen = () => {
       }
 
       Alert.alert("Échec de connexion", errorMessage);
+=======
+      router.replace("/(tabs)");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Impossible de se connecter au serveur.";
+      Alert.alert("Erreur", errorMessage);
+>>>>>>> origin/main
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +149,9 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+          <TouchableOpacity
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          >
             <Image
               source={isPasswordVisible ? eyeVisible : eyeHidden}
               style={styles.eyeIcon}
@@ -139,6 +169,14 @@ const LoginScreen = () => {
           ) : (
             <Text style={styles.buttonText}>Se Connecter</Text>
           )}
+        </TouchableOpacity>
+
+        {/* ✅ Lien mot de passe oublié */}
+        <TouchableOpacity
+          onPress={() => router.push("/screens/Forgot-Password")}
+          style={styles.forgotPassword}
+        >
+          <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
         </TouchableOpacity>
       </View>
 
@@ -167,6 +205,8 @@ const styles = StyleSheet.create({
   eyeIcon: { width: 20, height: 20, marginLeft: 10 },
   loginButton: { width: "60%", alignSelf: "center", backgroundColor: "#8BC34A", padding: 12, borderRadius: 50, alignItems: "center", marginTop: 20 },
   buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  forgotPassword: { alignSelf: "center", marginTop: 12 },
+  forgotPasswordText: { color: "#28A745", fontWeight: "bold", fontSize: 14 },
   signupTextContainer: { flexDirection: "row", marginTop: 40 },
   signupText: { color: "#333" },
   signupLink: { color: "#28A745", fontWeight: "bold" },
