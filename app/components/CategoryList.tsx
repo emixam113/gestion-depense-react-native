@@ -6,14 +6,13 @@ import {
 	TouchableOpacity,
 	Alert,
 	ActivityIndicator,
-	ScrollView
+	SectionList // Remplacement de ScrollView pour la performance
 } from "react-native";
-import { useTheme } from '../Context/ThemeContext';
-import { useAccessibility } from '../Context/Accessibility';
-// Importation de tes fonctions depuis ton fichier Api.tsx
-import { getWithAuth, deleteWithAuth } from "../services/Api";
+import { useTheme } from '../../Context/ThemeContext';
+import { useAccessibility } from '../../Context/Accessibility';
+import { getWithAuth, deleteWithAuth } from "../../services/Api";
 
-export interface Category{
+export interface Category {
 	id: number;
 	name: string;
 	color: string;
@@ -37,53 +36,43 @@ export default function CategoryList({
 	const [categories, setCategories] = useState<Category[]>([]);
 	const [loading, setLoading] = useState(true);
 
-	// 1. Charger les catégories au montage du composant
+	// 1. Charger les catégories
 	useEffect(() => {
 		const fetchCategories = async () => {
-			// Si pas de token, on ne tente même pas l'appel
 			if (!token) {
 				setLoading(false);
 				return;
 			}
-
 			try {
-				// On utilise ta fonction générique qui gère déjà l'IP et le Token
-				// Note : J'utilise "/category" (singulier) car c'est lestandard NestJS
 				const data = await getWithAuth<Category[]>("/categories");
 				setCategories(data);
 			} catch (error: any) {
 				console.error("Erreur fetch catégories:", error.message);
-				// Si l'erreur est une 404, tenteavec "/categories" (pluriel)
-				if (error.message.includes("404")) {
-					console.warn("Tentative avec le pluriel /categories...");
-				}
 				Alert.alert("Erreur", "Impossible de charger les catégories");
-			} finally {setLoading(false);
+			} finally {
+				setLoading(false);
 			}
 		};
-
 		fetchCategories();
 	}, [token]);
 
 	// 2. Supprimer une catégorie
 	const handleDelete = async (id: number, name: string) => {
 		Alert.alert(
-			"Confirmation",`Voulez-vous vraiment supprimer la catégorie "${name}" ?`,
+			"Confirmation",
+			`Voulez-vous vraiment supprimer la catégorie "${name}" ?`,
 			[
 				{ text: "Annuler", style: "cancel" },
 				{
 					text: "Supprimer",
 					style: "destructive",
 					onPress: async () => {
-						try {// Utilisation de ta fonction deleteWithAuth
+						try {
 							await deleteWithAuth(`/category/${id}`);
-
-							// Mise à jour locale de la liste
 							setCategories((prev) => prev.filter((c) => c.id !== id));
 							onDeleteCategory?.(id);
 							Alert.alert("Succès", "Catégorie supprimée");
 						} catch (error: any) {
-							console.error("Erreur suppression:", error.message);
 							Alert.alert("Erreur", "Impossible de supprimer la catégorie");
 						}
 					}
@@ -91,105 +80,100 @@ export default function CategoryList({
 			]);
 	};
 
-	// Séparer les catégories pour l'affichage
-	const defaultCategories = categories.filter((c) => c.isDefault);
-	const userCategories = categories.filter((c) => !c.isDefault);
+	// 3. Préparation des sections pour la SectionList
+	const sections = [
+		{
+			title: "🔒 Catégories par défaut",
+			data: categories.filter((c) => c.isDefault),
+			type: 'default'
+		},
+		{
+			title: "✏️ Mes catégories",
+			data: categories.filter((c) => !c.isDefault),
+			type: 'user'
+		},
+	];
+
+	// 4. Rendu d'un élément (Item)
+	const renderCategoryItem = ({ item }: { item: Category }) => (
+		<View style={[styles.categoryItem, { borderBottomColor: colors.border }]}>
+			<View style={styles.categoryInfo}>
+				<View style={[styles.colorDot, { backgroundColor: item.color }]} />
+				<Text style={[styles.categoryName, { fontFamily: fontFamily.regular, color: colors.text }]}>
+					{item.name}
+				</Text>
+			</View>
+
+			{item.isDefault ? (
+				<Text style={[styles.defaultLabel, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
+					(système)
+				</Text>
+			) : (
+				<TouchableOpacity
+					onPress={() => handleDelete(item.id, item.name)}
+					style={[styles.deleteButton, { backgroundColor: colors.error }]}
+				>
+					<Text style={[styles.deleteButtonText, { fontFamily: fontFamily.semiBold }]}>
+						Supprimer
+					</Text>
+				</TouchableOpacity>
+			)}
+		</View>
+	);
 
 	if (loading) {
-		return (<View style={[styles.container, { backgroundColor: colors.surface, justifyContent: 'center' }]}>
+		return (
+			<View style={[styles.container, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
 				<ActivityIndicator size="large" color={colors.primary} />
-				<Text style={{ textAlign: 'center', marginTop: 10, color: colors.text }}>Chargement...</Text>
+				<Text style={{ marginTop: 10, color: colors.text, fontFamily: fontFamily.regular }}>Chargement...</Text>
 			</View>
 		);
 	}
 
 	return (
-		<ScrollView style={[styles.container, { backgroundColor: colors.surface }]}>
-			{/* Section : Catégories par défaut (Système) */}
-			<Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
-				🔒 Catégories par défaut
-			</Text>
-
-			<View style={styles.categoryList}>
-				{defaultCategories.length === 0 ? (
-					<Text style={[styles.emptyText, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
-						Aucune catégorie par défaut trouvée.
+		<SectionList
+			style={[styles.container, { backgroundColor: colors.surface }]}
+			sections={sections}
+			keyExtractor={(item) => item.id.toString()}
+			renderItem={renderCategoryItem}
+			// Rendu des titres de sections
+			renderSectionHeader={({ section: { title, data } }) => (
+				<View style={{ backgroundColor: colors.surface }}>
+					<Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
+						{title}
 					</Text>
-				) : (
-					defaultCategories.map((cat) => (
-						<View
-							key={`default-${cat.id}`}
-							style={[styles.categoryItem, { borderBottomColor: colors.border }]}
-						>
-							<View style={styles.categoryInfo}>
-								<View style={[styles.colorDot, { backgroundColor: cat.color }]} />
-								<Text style={[styles.categoryName, { fontFamily: fontFamily.regular, color: colors.text }]}>{cat.name}
-								</Text>
-							</View>
-							<Text style={[styles.defaultLabel, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
-								(système)
-							</Text>
-						</View>
-					))
-				)}</View>
-
-			{/* Section : Catégories personnalisées (Utilisateur) */}
-			<Text style={[styles.sectionTitle, { fontFamily: fontFamily.semiBold, color: colors.text }]}>
-				✏️ Mes catégories
-			</Text>
-
-			<View style={styles.categoryList}>
-				{userCategories.length === 0 ? (
-					<Text style={[styles.emptyText, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
-						Vous n'avez pas encore créé de catégorie.
-					</Text>
-				) : (
-					userCategories.map((cat) => (
-						<View
-							key={`user-${cat.id}`}
-							style={[styles.categoryItem, { borderBottomColor: colors.border }]}
-						>
-							<View style={styles.categoryInfo}>
-								<View style={[styles.colorDot, { backgroundColor: cat.color }]} />
-								<Text style={[styles.categoryName, { fontFamily: fontFamily.regular, color: colors.text }]}>
-									{cat.name}
-								</Text>
-							</View>
-							<TouchableOpacity
-								onPress={() => handleDelete(cat.id, cat.name)}
-								style={[styles.deleteButton, { backgroundColor: colors.error }]}
-							>
-								<Text style={[styles.deleteButtonText, { fontFamily: fontFamily.semiBold }]}>
-									Supprimer
-								</Text>
-							</TouchableOpacity>
-						</View>
-					))
-				)}
-			</View>
-		</ScrollView>
+					{data.length === 0 && (
+						<Text style={[styles.emptyText, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
+							Aucun élément dans cette section.
+						</Text>
+					)}
+				</View>
+			)}
+			// Optimisation pour le scroll
+			stickySectionHeadersEnabled={false}
+			initialNumToRender={15}
+		/>
 	);
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		padding: 16,
+		paddingHorizontal: 16,
 		borderRadius: 8,
 	},
-	sectionTitle: {fontSize: 16,
-		marginTop: 20,
+	sectionTitle: {
+		fontSize: 14,
+		marginTop: 25,
 		marginBottom: 10,
 		textTransform: 'uppercase',
-		letterSpacing: 1,
+		letterSpacing: 1.2,
 	},
-	categoryList: {
-		marginBottom: 10,
-	},
-	categoryItem: {flexDirection: 'row',
+	categoryItem: {
+		flexDirection: 'row',
 		justifyContent: 'space-between',
 		alignItems: 'center',
-		paddingVertical: 15,
+		paddingVertical: 14,
 		borderBottomWidth: 1,
 	},
 	categoryInfo: {
@@ -198,13 +182,13 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	colorDot: {
-		width: 18,
-		height: 18,
-		borderRadius: 9,
+		width: 16,
+		height: 16,
+		borderRadius: 8,
 		marginRight: 12,
 	},
 	categoryName: {
-		fontSize:16,
+		fontSize: 16,
 		flex: 1,
 	},
 	defaultLabel: {
@@ -212,9 +196,9 @@ const styles = StyleSheet.create({
 		fontStyle: 'italic',
 	},
 	deleteButton: {
-		paddingHorizontal: 12,
+		paddingHorizontal: 14,
 		paddingVertical: 8,
-		borderRadius: 6,
+		borderRadius: 8,
 	},
 	deleteButtonText: {
 		color: '#FFF',
@@ -223,6 +207,7 @@ const styles = StyleSheet.create({
 	emptyText: {
 		fontSize: 14,
 		fontStyle: 'italic',
-		paddingVertical: 10,paddingLeft: 10,
+		paddingVertical: 10,
+		paddingLeft: 10,
 	},
 });

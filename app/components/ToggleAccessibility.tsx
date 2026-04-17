@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, Switch, StyleSheet } from "react-native";
-import { useAccessibility } from "../Context/Accessibility";
+import { useAccessibility } from "../../Context/Accessibility";
 
 interface AccessibilityToggleProps {
 	showLabel?: boolean;

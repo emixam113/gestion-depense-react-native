@@ -8,10 +8,10 @@ import {
 	Alert,
 	ScrollView
 } from "react-native";
-import { Category } from '../Types/category';
-import { useTheme } from '../Context/ThemeContext';
-import { useAccessibility } from '../Context/Accessibility';
-import {API_URL} from '../services/Api';
+import { Category } from '../../Types/category';
+import { useTheme } from '../../Context/ThemeContext';
+import { useAccessibility } from '../../Context/Accessibility';
+import {API_URL} from '../../services/Api';
 
 interface Props {
 	token: string | null;

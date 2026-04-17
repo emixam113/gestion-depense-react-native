@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
+const NGROK_URL = 'https://eun-obvolutive-maynard.ngrok-free.dev'
+
 export const API_URL = Platform.select({
-  android: "http://192.168.1.45:3000",
+  android: NGROK_URL,
   web: "http://localhost:3000",
 });
 

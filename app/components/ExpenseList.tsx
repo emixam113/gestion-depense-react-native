@@ -1,306 +1,262 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from 'react';
 import {
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	Alert,
-	ActivityIndicator
-} from "react-native";
-import { deleteWithAuth } from "../services/Api";
-import { useTheme } from '../Context/ThemeContext';
-import { useAccessibility } from '../Context/Accessibility';
-import EditExpenseModal from './EditExpenseModale'
-import type { Expense } from "../Types";
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  FlatList,
+} from 'react-native';
+import { Pencil, Trash2, CircleDollarSign, Receipt } from 'lucide-react-native';
+import { deleteWithAuth } from '../../services/Api';
+import { useTheme } from '../../Context/ThemeContext';
+import { useAccessibility } from '../../Context/Accessibility';
+import EditExpenseModal from './EditExpenseModale';
 
-type ExpenseListProps = {
-	expenses: Expense[];
-	onDeleteSuccess: (deletedId: number) => void;
-	onEditSuccess?: (updated: Expense) => void;
-	token: string | null;
-};
+import type { Expense } from '../../Types';
+import type { FontConfig } from '../../Context/Accessibility';
 
-// Formater la date
 const formatDate = (dateString: string): string => {
-	const date = new Date(dateString);
-	const today = new Date();
-	const yesterday = new Date(today);
-	yesterday.setDate(yesterday.getDate() - 1);
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  today.setHours(0, 0, 0, 0);
+  yesterday.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
 
-	// Réinitialiser les heures pour comparer juste les dates
-	today.setHours(0, 0, 0, 0);
-	yesterday.setHours(0, 0, 0, 0);
-	date.setHours(0, 0, 0, 0);
-
-	if (date.getTime() === today.getTime()) {
-		return "Aujourd'hui";
-	} else if (date.getTime() === yesterday.getTime()) {
-		return "Hier";
-	} else {
-		return date.toLocaleDateString('fr-FR', {
-			day: 'numeric',
-			month: 'short',
-			year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-		});
-	}
+  if (date.getTime() === today.getTime()) return "Aujourd'hui";
+  if (date.getTime() === yesterday.getTime()) return 'Hier';
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
 };
 
-// Composant pour chaque élément de la liste
-function ExpenseItem({
-	item,
-	onDeleteSuccess,
-	onEdit,
-	colors,
-	fontFamily
-}: {
-	item: Expense;
-	onDeleteSuccess: (id: number) => void;
-	onEdit: (expense: Expense) => void;
-	colors: any;
-	fontFamily: any;
-}) {
-	const [isDeleting, setIsDeleting] = useState(false);
+const ExpenseItem = memo(({
+  item,
+  onDeleteSuccess,
+  onEdit,
+  colors,
+  fontFamily,
+  accessibleFont
+}: any) => {
+  const [isDeleting, setIsDeleting] = useState(false);
 
-	const handleDelete = () => {
-		Alert.alert(
-			"Confirmation",
-			`Voulez-vous vraiment supprimer "${item.label}" ?`,
-			[
-				{ text: "Annuler", style: "cancel" },
-				{
-					text: "Supprimer",
-					style: "destructive",
-					onPress: async () => {
-						setIsDeleting(true);
-						try {
-							await deleteWithAuth(`/expenses/${item.id}`);
-							onDeleteSuccess(item.id);
-							Alert.alert("Succès", "Transaction supprimée.");
-						} catch (error: any) {
-							console.error("Erreur suppression:", error.message);
-							Alert.alert("Erreur", `Impossible de supprimer la transaction : ${error.message}`);
-						} finally {
-							setIsDeleting(false);
-						}
-					}
-				},
-			]
-		);
-	};
+  const handleDelete = () => {
+    Alert.alert('Confirmation', `Supprimer "${item.label}" ?`, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          setIsDeleting(true);
+          try {
+            await deleteWithAuth(`/expenses/${item.id}`);
+            onDeleteSuccess(item.id);
+          } catch (error) {
+            Alert.alert('Erreur', 'Suppression impossible');
+          } finally {
+            setIsDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
 
-	const isIncome = item.type === "income";
-	const amountValue = parseFloat(item.amount) || 0;
-	const displayAmount = Math.abs(amountValue);
+  const isIncome = item.type === 'income';
+  const displayAmount = Math.abs(parseFloat(item.amount) || 0);
 
-	return (
-		<View style={[styles.item, { backgroundColor: colors.cardBackground }]}>
-			<View style={styles.detailsContainer}>
-				<Text style={styles.typeIcon}>{isIncome ? "💰" : "💸"}</Text>
+  const textStyle = (type: keyof FontConfig, size: number) => ({
+    fontFamily: fontFamily[type],
+    fontSize: size,
+    lineHeight: accessibleFont ? size * 1.4 : size * 1.2,
+    letterSpacing: accessibleFont ? 0.5 : 0,
+  });
 
-				<View style={styles.textContainer}>
-					<Text style={[
-						styles.descriptionText,
-						{ fontFamily: fontFamily.semiBold, color: colors.text }
-					]}>
-						{item.label}
-					</Text>
-					<View style={styles.metaRow}>
-						<Text style={[
-							styles.category,
-							{ fontFamily: fontFamily.regular, color: colors.textSecondary }
-						]}>
-							{item.category.name}
-						</Text>
-						<Text style={[
-							styles.separator,
-							{ color: colors.textSecondary }
-						]}>
-							•
-						</Text>
-						<Text style={[
-							styles.date,
-							{ fontFamily: fontFamily.regular, color: colors.textSecondary }
-						]}>
-							{formatDate(item.date)}
-						</Text>
-					</View>
-				</View>
+  return (
+    <View style={[styles.item, { backgroundColor: colors.cardBackground }]}>
+      {/* SECTION GAUCHE : Icône + Libellés */}
+      <View style={styles.leftContainer}>
+        <View style={[styles.iconWrapper, { backgroundColor: isIncome ? '#2CC26D15' : '#FF6B6B15' }]}>
+          {isIncome ?
+            <CircleDollarSign size={20} color="#2CC26D" /> :
+            <Receipt size={20} color="#FF6B6B" />
+          }
+        </View>
 
-				<Text style={[
-					styles.amountText,
-					{ fontFamily: fontFamily.bold },
-					isIncome ? styles.income : styles.expense
-				]}>
-					{isIncome ? "+" : "-"} {displayAmount.toFixed(2)} €
-				</Text>
-			</View>
+        <View style={styles.textContainer}>
+          <Text
+            numberOfLines={1}
+            style={[textStyle('semiBold', 15), { color: colors.text }]}
+          >
+            {item.label}
+          </Text>
+          <View style={styles.metaRow}>
+            <Text numberOfLines={1} style={[textStyle('regular', 12), { color: colors.textSecondary, flexShrink: 1 }]}>
+              {item.category.name}
+            </Text>
+            <Text style={[styles.separator, { color: colors.textSecondary }]}>•</Text>
+            <Text style={[textStyle('regular', 12), { color: colors.textSecondary }]}>
+              {formatDate(item.date)}
+            </Text>
+          </View>
+        </View>
+      </View>
 
-			<View style={styles.buttonContainer}>
-				{/* Bouton Modifier */}
-				<TouchableOpacity
-					style={[styles.editButton, { backgroundColor: colors.primary }]}
-					onPress={() => onEdit(item)}
-				>
-					<Text style={styles.buttonIcon}>✏️</Text>
-				</TouchableOpacity>
+      {/* SECTION DROITE : Montant + Actions */}
+      <View style={styles.rightContainer}>
+        <Text style={[
+          textStyle('bold', 14),
+          isIncome ? styles.income : styles.expense,
+          styles.amountText
+        ]}>
+          {isIncome ? '+' : '-'} {displayAmount.toFixed(2)}€
+        </Text>
 
-				{/* Bouton Supprimer */}
-				<TouchableOpacity
-					style={[styles.deleteButton, { backgroundColor: colors.error }]}
-					onPress={handleDelete}
-					disabled={isDeleting}
-				>
-					{isDeleting ? (
-						<ActivityIndicator color="#fff" size="small" />
-					) : (
-						<Text style={styles.buttonIcon}>🗑️</Text>
-					)}
-				</TouchableOpacity>
-			</View>
-		</View>
-	);
-}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.smallButton, { backgroundColor: colors.primary + '15' }]}
+            onPress={() => onEdit(item)}
+          >
+            <Pencil size={16} color={colors.primary} />
+          </TouchableOpacity>
 
-// Composant principal
-export default function ExpenseList({
-	expenses,
-	onDeleteSuccess,
-	onEditSuccess,
-	token
-}: ExpenseListProps) {
-	const { colors } = useTheme();
-	const { fontFamily } = useAccessibility();
-	const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+          <TouchableOpacity
+            style={[styles.smallButton, { backgroundColor: colors.error + '15' }]}
+            onPress={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Trash2 size={16} color={colors.error} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+});
 
-	const handleEditSuccess = (updated: Expense) => {
-		if (onEditSuccess) {
-			onEditSuccess(updated);
-		}
-		setEditingExpense(null);
-	};
+export default function ExpenseList({ expenses, onDeleteSuccess, onEditSuccess, token }: any) {
+  const { colors } = useTheme();
+  const { fontFamily, accessibleFont } = useAccessibility();
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-	if (!expenses || expenses.length === 0) {
-		return (
-			<Text style={[
-				styles.emptyText,
-				{ fontFamily: fontFamily.regular, color: colors.textSecondary }
-			]}>
-				Aucune transaction pour le moment
-			</Text>
-		);
-	}
+  const renderItem = useCallback(
+    ({ item }: { item: Expense }) => (
+      <ExpenseItem
+        item={item}
+        onDeleteSuccess={onDeleteSuccess}
+        onEdit={setEditingExpense}
+        colors={colors}
+        fontFamily={fontFamily}
+        accessibleFont={accessibleFont}
+      />
+    ),
+    [colors, fontFamily, accessibleFont, onDeleteSuccess],
+  );
 
-	return (
-		<>
-			<View style={styles.list}>
-				{expenses.map((item) => (
-					<ExpenseItem
-						key={item.id.toString()}
-						item={item}
-						onDeleteSuccess={onDeleteSuccess}
-						onEdit={setEditingExpense}
-						colors={colors}
-						fontFamily={fontFamily}
-					/>
-				))}
-			</View>
+  return (
+    <>
+      <FlatList
+        data={expenses}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id.toString()}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { fontFamily: fontFamily.regular, color: colors.textSecondary }]}>
+            Aucune transaction
+          </Text>
+        }
+        contentContainerStyle={styles.list}
+        removeClippedSubviews={true}
+        scrollEnabled={false}
+      />
 
-			{/* Modal d'édition */}
-			<EditExpenseModal
-				visible={editingExpense !== null}
-				expense={editingExpense}
-				onClose={() => setEditingExpense(null)}
-				onSave={handleEditSuccess}
-				token={token}
-			/>
-		</>
-	);
+      <EditExpenseModal
+        visible={editingExpense !== null}
+        expense={editingExpense}
+        onClose={() => setEditingExpense(null)}
+        onSave={(u) => { onEditSuccess?.(u); setEditingExpense(null); }}
+        token={token}
+      />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
-	list: {
-		paddingBottom: 20,
-	},
-	item: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 12,
-		marginVertical: 6,
-		borderRadius: 8,
-		elevation: 2,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 1 },
-		shadowOpacity: 0.1,
-		shadowRadius: 2,
-	},
-	detailsContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1,
-	},
-	typeIcon: {
-		fontSize: 20,
-		marginRight: 10,
-	},
-	textContainer: {
-		flex: 1,
-		marginRight: 10,
-	},
-	descriptionText: {
-		fontSize: 16,
-		marginBottom: 4,
-	},
-	metaRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-	},
-	category: {
-		fontSize: 12,
-	},
-	separator: {
-		fontSize: 12,
-		marginHorizontal: 2,
-	},
-	date: {
-		fontSize: 12,
-	},
-	amountText: {
-		fontSize: 16,
-		marginRight: 10,
-	},
-	income: {
-		color: "#2CC26D",
-	},
-	expense: {
-		color: "#FF6B6B",
-	},
-	buttonContainer: {
-		flexDirection: "row",
-		gap: 6,
-	},
-	editButton: {
-		width: 36,
-		height: 36,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: 6,
-	},
-	deleteButton: {
-		width: 36,
-		height: 36,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: 6,
-	},
-	buttonIcon: {
-		fontSize: 16,
-	},
-	emptyText: {
-		fontSize: 16,
-		textAlign: "center",
-		marginTop: 20,
-		fontStyle: "italic",
-	},
+  list: { paddingBottom: 10 },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    marginVertical: 6,
+    borderRadius: 16,
+    // Ombre plus discrète pour le look épuré
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  leftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1, // Prend tout l'espace restant
+    marginRight: 10,
+  },
+  iconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  separator: {
+    marginHorizontal: 4,
+    fontSize: 10,
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: -30,
+  },
+  amountText: {
+    textAlign: 'right',
+    marginRight: 10,
+    minWidth: 90,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  smallButton: {
+    width: 34,
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  income: { color: '#2CC26D' },
+  expense: { color: '#FF6B6B' },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 30,
+    fontSize: 14,
+    opacity: 0.5,
+  }
 });

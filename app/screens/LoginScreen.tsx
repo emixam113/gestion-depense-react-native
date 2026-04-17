@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { login, registerPushToken } from "../services/Api";
-import { getPushToken, initNotifications } from "../services/NotificationService";
+import { login, registerPushToken } from "../../services/Api";
+import { getPushToken, initNotifications } from "../../services/NotificationService";
 
 const logo = require("../../assets/images/logo.png");
 const eyeVisible = require("../../assets/images/Vector.png");
@@ -26,37 +26,63 @@ const LoginScreen = () => {
   const router = useRouter();
 
   const handleLogin = async () => {
+    // 1. Validation basique
     if (!email || !password) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs.");
       return;
     }
 
     setIsLoading(true);
+    console.log("🚀 Tentative de connexion pour :", email);
+
     try {
+      // 2. Appel à ton service API (ton propre backend)
       const authData = await login(email, password);
+      console.log("✅ Serveur a répondu :", authData);
 
-      await AsyncStorage.setItem("user", JSON.stringify(authData.user));
-      await AsyncStorage.setItem("token", authData.access_token);
+      // 3. Stockage des infos de session
+      if (authData?.user && authData?.access_token) {
+        await AsyncStorage.setItem("user", JSON.stringify(authData.user));
+        await AsyncStorage.setItem("token", authData.access_token);
+      } else {
+        throw new Error("Réponse du serveur incomplète (user ou token manquant)");
+      }
 
-      // ── Enregistrement du token push après login réussi ──────────
+      // 4. Gestion des notifications (ne bloque pas la connexion si ça échoue)
       try {
-        await initNotifications(); // Demande les permissions si pas encore fait
+        console.log("🔔 Initialisation des notifications...");
+        await initNotifications();
         const pushToken = await getPushToken();
+
         if (pushToken) {
+          console.log("📡 Envoi du token au backend :", pushToken);
           await registerPushToken(pushToken);
         }
       } catch (pushError) {
-        // Ne pas bloquer la navigation si les notifs échouent
-        console.warn('[Push] Erreur enregistrement token:', pushError);
+        console.warn('[Push] Erreur non bloquante :', pushError);
       }
-      // ─────────────────────────────────────────────────────────────
 
+      // 5. Navigation vers l'app
       Alert.alert("Succès", "Connexion réussie !");
-      router.replace("/(tabs)");
-    } catch (err) {
-      console.error("Erreur login:", err);
-      const errorMessage = err instanceof Error ? err.message : "Impossible de se connecter au serveur";
-      Alert.alert("Erreur", errorMessage);
+      router.replace("/(tabs)/Dashboard");
+
+    } catch (err: any) {
+      // 6. Analyse précise de l'erreur
+      console.error("❌ Erreur Login détaillée :", err);
+
+      let errorMessage = "Impossible de se connecter au serveur.";
+
+      if (err.response) {
+        // Le serveur a répondu avec un code d'erreur (401, 404, 500...)
+        errorMessage = err.response.data?.message || `Erreur serveur (${err.response.status})`;
+      } else if (err.request) {
+        // La requête est partie mais pas de réponse (problème réseau ou serveur éteint)
+        errorMessage = "Le serveur ne répond pas. Vérifiez votre connexion.";
+      } else {
+        errorMessage = err.message;
+      }
+
+      Alert.alert("Échec de connexion", errorMessage);
     } finally {
       setIsLoading(false);
     }

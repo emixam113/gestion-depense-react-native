@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState, useContext } from 'react';
 import {
     View,
     Text,
@@ -6,86 +6,59 @@ import {
     TouchableOpacity,
     ScrollView,
     Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../Context/ThemeContext';
-import { useAccessibility } from '../Context/Accessibility';
+import Purchases, { PurchasesPackage } from 'react-native-purchases';
+import { useTheme } from '../../Context/ThemeContext';
+import { useAccessibility } from '../../Context/Accessibility';
+import { SubscriptionContext } from '../../Context/SubscriptionsProvider';
 
-
-const OFFERS = [
-    {
-        id: 'free',
-        title: 'Plan Basique',
-        price: 'Gratuit',
-        features: [
-            'Jusqu\'à 50 transactions par mois',
-            '1 seul compte de suivi',
-            'Analyses de base',
-            'Sauvegarde des données locale'
-        ],
-        color: '#34C759', // Vert
-    },
-    {
-        id: 'premium',
-        title: 'Premium Illimité',
-        price: '4.99 € / mois',
-        features: [
-            'Transactions illimitées (plus de limites)',
-            'Comptes multiples (jusqu\'à 10)',
-            'Analyses et rapports avancés',
-            'Export CSV illimité',
-            'Sécurité et chiffrement renforcés' // Synchronisation Cloud retirée
-        ],
-        color: '#FFD700', // Or/Jaune
-    },
-];
-
-// =====================
-// Composant Carte d'Offre (Réutilisable)
-// =====================
-const OfferCard = React.memo(({ offer, currentSubscriptionId, handleAction }: any) => {
+const OfferCard = React.memo(({ pkg, isCurrent, handleAction }: any) => {
     const { colors } = useTheme();
     const { fontFamily } = useAccessibility();
-    const isCurrent = offer.id === currentSubscriptionId;
+
+    // RevenueCat extrait les infos du produit (Titre, Prix, Description)
+    const { title, priceString, description } = pkg.product;
+
+    const isPremium = title.toLowerCase().includes('premium');
+    const accentColor = isPremium ? '#FFD700' : '#34C759';
 
     const cardStyle = useMemo(() => ([
         styles.offerCard,
         {
-            backgroundColor: isCurrent ? offer.color + '20' : colors.cardBackground,
-            borderColor: isCurrent ? offer.color : colors.border
+            backgroundColor: isCurrent ? accentColor + '20' : colors.cardBackground,
+            borderColor: isCurrent ? accentColor : colors.border
         }
-    ]), [isCurrent, offer.color, colors.cardBackground, colors.border]);
+    ]), [isCurrent, colors.cardBackground, colors.border, accentColor]);
 
     return (
         <View style={cardStyle}>
-            <Text style={[styles.offerTitle, { fontFamily: fontFamily.bold, color: isCurrent ? offer.color : colors.text }]}>
-                {offer.title} {isCurrent ? ' (Actif)' : ''}
+            <Text style={[styles.offerTitle, { fontFamily: fontFamily.bold, color: isCurrent ? accentColor : colors.text }]}>
+                {title} {isCurrent ? ' (Actif)' : ''}
             </Text>
-            <Text style={[styles.offerPrice, { color: colors.text }]}>{offer.price}</Text>
+            <Text style={[styles.offerPrice, { color: colors.text }]}>{priceString}</Text>
 
             <View style={styles.featureList}>
-                {offer.features.map((feature: string, index: number) => (
-                    <Text key={index} style={[styles.featureText, { color: colors.textSecondary }]}>
-                        ✅ {feature}
-                    </Text>
-                ))}
+                <Text style={[styles.featureText, { color: colors.textSecondary }]}>
+                    ✅ {description || "Accès complet aux fonctionnalités Premium"}
+                </Text>
             </View>
 
-            {/* Bouton d'action: Mettre à niveau ou Indiquer le plan actif */}
             {!isCurrent && (
                 <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: offer.color }]}
-                    onPress={() => handleAction(offer.id, offer.title)}
+                    style={[styles.actionButton, { backgroundColor: accentColor }]}
+                    onPress={() => handleAction(pkg)}
                 >
                     <Text style={[styles.actionButtonText, { fontFamily: fontFamily.semiBold }]}>
-                        {offer.id === 'free' ? 'Plan de base' : `Passer à ${offer.title}`}
+                        S'abonner
                     </Text>
                 </TouchableOpacity>
             )}
 
             {isCurrent && (
-                <Text style={[styles.currentPlanText, { color: offer.color, fontFamily: fontFamily.semiBold }]}>
-                    C'est votre plan actuel !
+                <Text style={[styles.currentPlanText, { color: accentColor, fontFamily: fontFamily.semiBold }]}>
+                    Votre plan actuel
                 </Text>
             )}
         </View>
@@ -100,35 +73,55 @@ export default function SubscriptionScreen() {
     const { fontFamily } = useAccessibility();
     const router = useRouter();
 
-    // 💡 Simulation du statut de l'utilisateur.
-    const currentSubscriptionId = 'free';
+    // ✅ Utilisation du contexte pour suivre le statut Premium
+    const { isPremium, loading: contextLoading } = useContext(SubscriptionContext);
+    const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+    const [fetching, setFetching] = useState(true);
 
-    const handleAction = (offerId: string, offerTitle: string) => {
-        if (offerId === 'premium') {
-            Alert.alert(
-                'Abonnement Premium',
-                `Démarrer l'upgrade vers ${offerTitle}. (Appel au service de paiement)`,
-                [
-                    { text: 'Annuler', style: 'cancel' },
-                    { text: 'Procéder au paiement', onPress: () => console.log('Paiement pour Premium initié.') }
-                ]
-            );
-        } else {
-             Alert.alert('Information', 'Ceci est le plan de base, pas d\'action requise.');
+    // Charger les offres réelles configurées sur RevenueCat
+    useEffect(() => {
+        const loadOfferings = async () => {
+            try {
+                const offerings = await Purchases.getOfferings();
+                if (offerings.current !== null) {
+                    setPackages(offerings.current.availablePackages);
+                }
+            } catch (e: any) {
+                console.error("Erreur RevenueCat Offerings:", e);
+            } finally {
+                setFetching(false);
+            }
+        };
+        loadOfferings();
+    }, []);
+
+    // Gestion de l'achat réel
+    const handlePurchase = async (pkg: PurchasesPackage) => {
+        try {
+            const { customerInfo } = await Purchases.purchasePackage(pkg);
+
+            // Vérification de l'entitlement défini dans RevenueCat
+            if (typeof customerInfo.entitlements.active['premium'] !== "undefined") {
+                Alert.alert("Succès", "Félicitations, vous êtes Premium !");
+                router.back();
+            }
+        } catch (e: any) {
+            if (!e.userCancelled) {
+                Alert.alert("Erreur", e.message);
+            }
         }
     };
 
-    const handleManageBilling = () => {
-        Alert.alert(
-            'Gestion de la Facturation',
-            'Ouverture du portail de facturation pour gérer le paiement ou annuler l\'abonnement Premium.',
-            [{ text: 'OK' }]
+    if (fetching || contextLoading) {
+        return (
+            <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+            </View>
         );
     }
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.primary }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Text style={styles.backIcon}>‹</Text>
@@ -138,30 +131,23 @@ export default function SubscriptionScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-
                 <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: fontFamily.bold }]}>
-                    Améliorez vos finances
+                    {isPremium ? "Merci de votre soutien !" : "Améliorez vos finances"}
                 </Text>
 
-                {OFFERS.map(offer => (
-                    <OfferCard
-                        key={offer.id}
-                        offer={offer}
-                        currentSubscriptionId={currentSubscriptionId}
-                        handleAction={handleAction}
-                    />
-                ))}
-
-                {/* Information et lien de gestion pour les abonnés Premium */}
-                {currentSubscriptionId === 'premium' && (
-                    <TouchableOpacity
-                        style={styles.manageLink}
-                        onPress={handleManageBilling}
-                    >
-                        <Text style={[styles.linkText, { color: colors.primary, fontFamily: fontFamily.semiBold }]}>
-                            Gérer ma facturation et annuler
-                        </Text>
-                    </TouchableOpacity>
+                {packages.length > 0 ? (
+                    packages.map((pkg) => (
+                        <OfferCard
+                            key={pkg.identifier}
+                            pkg={pkg}
+                            isCurrent={isPremium && pkg.product.identifier.includes('premium')}
+                            handleAction={handlePurchase}
+                        />
+                    ))
+                ) : (
+                    <Text style={{ color: colors.text, textAlign: 'center', marginTop: 20 }}>
+                        Aucune offre disponible pour le moment.
+                    </Text>
                 )}
             </ScrollView>
         </View>
@@ -169,9 +155,8 @@ export default function SubscriptionScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
+    container: { flex: 1 },
+    centered: { justifyContent: 'center', alignItems: 'center' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -180,75 +165,17 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
         paddingHorizontal: 20,
     },
-    backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    backIcon: {
-        fontSize: 32,
-        color: '#FFF',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#FFF',
-    },
-    content: {
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        marginTop: 10,
-        marginBottom: 25,
-        textAlign: 'center',
-    },
-    offerCard: {
-        padding: 20,
-        borderRadius: 16,
-        marginBottom: 20,
-        borderWidth: 2,
-    },
-    offerTitle: {
-        fontSize: 22,
-        marginBottom: 8,
-    },
-    offerPrice: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        marginBottom: 15,
-    },
-    featureList: {
-        marginBottom: 20,
-        gap: 8,
-    },
-    featureText: {
-        fontSize: 14,
-    },
-    actionButton: {
-        padding: 12,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    actionButtonText: {
-        fontSize: 16,
-        color: '#FFF',
-    },
-    currentPlanText: {
-        fontSize: 16,
-        textAlign: 'center',
-        padding: 12,
-        fontWeight: 'bold',
-    },
-    manageLink: {
-        marginTop: 15,
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    linkText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-    }
+    backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+    backIcon: { fontSize: 32, color: '#FFF' },
+    headerTitle: { fontSize: 20, fontWeight: '600', color: '#FFF' },
+    content: { paddingHorizontal: 20, paddingVertical: 10 },
+    sectionTitle: { fontSize: 18, marginTop: 10, marginBottom: 25, textAlign: 'center' },
+    offerCard: { padding: 20, borderRadius: 16, marginBottom: 20, borderWidth: 2 },
+    offerTitle: { fontSize: 22, marginBottom: 8 },
+    offerPrice: { fontSize: 28, fontWeight: 'bold', marginBottom: 15 },
+    featureList: { marginBottom: 20, gap: 8 },
+    featureText: { fontSize: 14 },
+    actionButton: { padding: 12, borderRadius: 10, alignItems: 'center' },
+    actionButtonText: { fontSize: 16, color: '#FFF' },
+    currentPlanText: { fontSize: 16, textAlign: 'center', padding: 12, fontWeight: 'bold' }
 });

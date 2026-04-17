@@ -1,9 +1,9 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native";
 import { PieChart } from "react-native-gifted-charts";
-import { getCategoryColor } from "../Utils/Colors";
-import { useAccessibility } from "../Context/Accessibility";
-import { useTheme } from "../Context/ThemeContext";
+import { getCategoryColor } from "../../Utils/Colors";
+import { useAccessibility } from "../../Context/Accessibility";
+import { useTheme } from "../../Context/ThemeContext";
 
 type GraphProps = {
     revenus?: Record<string, number>;

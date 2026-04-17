@@ -11,7 +11,7 @@ import {
 	Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { signup } from "../services/Api"; // ⬅️ Importe TA fonction signup
+import { signup } from "../../services/Api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SignupScreen() {

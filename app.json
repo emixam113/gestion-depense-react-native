@@ -27,22 +27,34 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.png",
-          "imageWidth": 200,
+          "imageWidth": 100,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
+      "react-native-google-mobile-ads": {
+        "android_app_id": "ca-app-pub-3940256099942544~3347511713",
+        "ios_app_id": "ca-app-pub-3940256099942544~1458002511"
+      },
       "router": {},
       "eas": {
         "projectId": "0b3202e8-3679-4b0e-a031-59a133562fd5"

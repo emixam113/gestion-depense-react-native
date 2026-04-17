@@ -1,23 +1,26 @@
-import { AccessibilityProvider } from './Context/Accessibility';
-import { ThemeProvider } from './Context/ThemeContext';
-import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
+
+import { AccessibilityProvider } from '../Context/Accessibility';
+import { ThemeProvider } from '../Context/ThemeContext';
+import { SubscriptionsProvider } from '../Context/SubscriptionsProvider';
+
 import {
   initNotifications,
   scheduleMonthlyReport,
   checkInactivity,
   scheduleInactivityReminder,
-  addNotificationListeners,
-} from './services/NotificationService';
+} from '../services/NotificationService';
 
-// ─── Handler foreground — SDK 53+ ────────────────────────────
+// Configuration des notifications
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,   // ← SDK 53+ (remplace shouldShowAlert)
-    shouldShowList: true,     // ← SDK 53+
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -31,53 +34,48 @@ export default function RootLayout() {
     'Atkinson-Bold': require('../assets/fonts/AtkinsonHyperlegible-Bold.ttf'),
   });
 
+  const userId = 6;
+
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
   }, [fontsLoaded]);
 
   useEffect(() => {
-    async function setup() {
+    async function setupApp() {
       try {
-        // 1. Initialiser les permissions + canaux Android
+        console.log('[System] Initialisation...');
+
+        // Demande de permission Android 13+
+        if (Platform.OS === 'android') {
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          let finalStatus = existingStatus;
+
+          if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+          }
+
+          if (finalStatus !== 'granted') {
+            console.warn('[Notifications] Permission refusée.');
+          } else {
+            console.log('[Notifications] Permission OK !');
+          }
+        }
+
+        // Initialisation des services
         await initNotifications();
-
-        // 2. Planifier le rapport mensuel (1er du mois à 9h)
         await scheduleMonthlyReport();
-
-        // 3. Vérifier l'inactivité et planifier le rappel
         await checkInactivity(3);
         await scheduleInactivityReminder(3);
 
-        // 4. Reset des alertes budget le 1er du mois
-        const today = new Date();
-        if (today.getDate() === 1) {
-          const { resetBudgetAlerts } = await import('./services/NotificationService');
-          await resetBudgetAlerts();
-        }
-
       } catch (error) {
-        console.warn('[Notifications] Erreur initialisation:', error);
+        console.warn('[System] Erreur setup:', error);
       }
     }
-    setup();
-  }, []);
 
-  useEffect(() => {
-    // Listeners — notif reçue en foreground
-    const onReceive = (notification: Notifications.Notification) => {
-      console.log('[Notif reçue]', notification.request.content.title);
-    };
-
-    // Listener — utilisateur tape sur une notif
-    const onResponse = (response: Notifications.NotificationResponse) => {
-      const data = response.notification.request.content.data;
-      console.log('[Notif tapée]', data);
-      // Vous pouvez ajouter une navigation ici selon data.type
-      // ex: if (data.type === 'budget_exceeded') router.push('/(tabs)/stats');
-    };
-
-    const cleanup = addNotificationListeners(onReceive, onResponse);
-    return cleanup;
+    setupApp();
   }, []);
 
   if (!fontsLoaded) return null;
@@ -85,7 +83,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AccessibilityProvider>
-        <Stack />
+        <SubscriptionsProvider userId={userId}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </SubscriptionsProvider>
       </AccessibilityProvider>
     </ThemeProvider>
   );
