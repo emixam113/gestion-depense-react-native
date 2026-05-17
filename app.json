@@ -18,7 +18,7 @@
       },
       "edgeToEdgeEnabled": true,
       "googleServicesFile": "./google-services.json",
-      "package": "com.anonymous.gestiondepense"
+      "package": "com.maxime.financeapp"
     },
     "web": {
       "bundler": "metro",
@@ -57,7 +57,7 @@
       },
       "router": {},
       "eas": {
-        "projectId": "0b3202e8-3679-4b0e-a031-59a133562fd5"
+        "projectId": "0230f658-062e-4340-9750-a92437637841"
       }
     }
   }

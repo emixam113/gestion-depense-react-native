@@ -10,14 +10,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-<<<<<<< HEAD
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { login, registerPushToken } from "../../services/Api";
-import { getPushToken, initNotifications } from "../../services/NotificationService";
-=======
-import { login, registerPushToken } from "../services/Api";
-import { getPushToken, initNotifications } from "../services/NotificationService";
->>>>>>> origin/main
+// ✅ Correction de l'import : on ne garde que initNotifications
+import { initNotifications } from "../../services/NotificationService";
 
 const logo = require("../../assets/images/logo.png");
 const eyeVisible = require("../../assets/images/Vector.png");
@@ -31,86 +28,42 @@ const LoginScreen = () => {
   const router = useRouter();
 
   const handleLogin = async () => {
-    // 1. Validation basique
     if (!email || !password) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs.");
       return;
     }
 
     setIsLoading(true);
-    console.log("🚀 Tentative de connexion pour :", email);
 
     try {
-<<<<<<< HEAD
-      // 2. Appel à ton service API (ton propre backend)
       const authData = await login(email, password);
-      console.log("✅ Serveur a répondu :", authData);
 
-      // 3. Stockage des infos de session
       if (authData?.user && authData?.access_token) {
+        await AsyncStorage.setItem("userToken", authData.access_token);
         await AsyncStorage.setItem("user", JSON.stringify(authData.user));
-        await AsyncStorage.setItem("token", authData.access_token);
       } else {
-        throw new Error("Réponse du serveur incomplète (user ou token manquant)");
+        throw new Error("Données de session incomplètes.");
       }
 
-      // 4. Gestion des notifications (ne bloque pas la connexion si ça échoue)
+      // ✅ LOGIQUE DE NOTIFICATION CORRIGÉE
       try {
-        console.log("🔔 Initialisation des notifications...");
-        await initNotifications();
-        const pushToken = await getPushToken();
-
+        // initNotifications() initialise ET renvoie le token
+        const pushToken = await initNotifications();
         if (pushToken) {
-          console.log("📡 Envoi du token au backend :", pushToken);
           await registerPushToken(pushToken);
         }
       } catch (pushError) {
         console.warn('[Push] Erreur non bloquante :', pushError);
-=======
-      // ✅ Api.tsx gère déjà le stockage du token et du user
-      await login(email, password);
-
-      // ✅ Enregistrement du token push après login réussi
-      try {
-        await initNotifications();
-        const pushToken = await getPushToken();
-        if (pushToken) await registerPushToken(pushToken);
-      } catch {
-        // Ne pas bloquer la navigation si les notifs échouent
->>>>>>> origin/main
       }
 
-      // 5. Navigation vers l'app
-      Alert.alert("Succès", "Connexion réussie !");
-<<<<<<< HEAD
-      router.replace("/(tabs)/Dashboard");
+      Alert.alert("Succès", `Bienvenue ${authData.user.firstName || ''} !`);
+      router.replace("/Dashboard");
 
     } catch (err: any) {
-      // 6. Analyse précise de l'erreur
-      console.error("❌ Erreur Login détaillée :", err);
-
-      let errorMessage = "Impossible de se connecter au serveur.";
-
-      if (err.response) {
-        // Le serveur a répondu avec un code d'erreur (401, 404, 500...)
-        errorMessage = err.response.data?.message || `Erreur serveur (${err.response.status})`;
-      } else if (err.request) {
-        // La requête est partie mais pas de réponse (problème réseau ou serveur éteint)
-        errorMessage = "Le serveur ne répond pas. Vérifiez votre connexion.";
-      } else {
-        errorMessage = err.message;
-      }
-
+      console.error("❌ Erreur Login :", err);
+      let errorMessage = "Identifiants incorrects ou serveur indisponible.";
+      if (err.response?.data?.message) errorMessage = err.response.data.message;
       Alert.alert("Échec de connexion", errorMessage);
-=======
-      router.replace("/(tabs)");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Impossible de se connecter au serveur.";
-      Alert.alert("Erreur", errorMessage);
->>>>>>> origin/main
     } finally {
       setIsLoading(false);
     }
@@ -149,9 +102,7 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity
-            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-          >
+          <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
             <Image
               source={isPasswordVisible ? eyeVisible : eyeHidden}
               style={styles.eyeIcon}
@@ -171,7 +122,6 @@ const LoginScreen = () => {
           )}
         </TouchableOpacity>
 
-        {/* ✅ Lien mot de passe oublié */}
         <TouchableOpacity
           onPress={() => router.push("/screens/Forgot-Password")}
           style={styles.forgotPassword}
@@ -182,7 +132,7 @@ const LoginScreen = () => {
 
       <View style={styles.signupTextContainer}>
         <Text style={styles.signupText}>Pas encore de compte ?</Text>
-        <TouchableOpacity onPress={() => router.push("/screens/Signup")}>
+        <TouchableOpacity onPress={() => router.push("/app/screens/Signup")}>
           <Text style={styles.signupLink}> S'inscrire</Text>
         </TouchableOpacity>
       </View>
@@ -192,15 +142,15 @@ const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   outerContainer: { flex: 1, backgroundColor: "#EAF7EF", alignItems: "center" },
-  topContainer: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", width: "100%", padding: 20 },
+  topContainer: { flexDirection: "row", alignItems: "center", width: "100%", padding: 20, top: 30,},
   logoContainer: { backgroundColor: "#28A745", width: 50, height: 50, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   logo: { width: 40, height: 40 },
   tagline: { fontSize: 14, fontWeight: "bold", marginLeft: 10 },
   welcomeTitle: { fontSize: 30, fontWeight: "bold", marginTop: 50, marginBottom: 30 },
-  formContainer: { backgroundColor: "#A8E3B6", width: "90%", padding: 20, borderRadius: 20, alignItems: "flex-start" },
+  formContainer: { backgroundColor: "#A8E3B6", width: "90%", padding: 20, borderRadius: 20 },
   label: { fontSize: 16, fontWeight: "bold", color: "#333", marginBottom: 5, marginTop: 10 },
   input: { width: "100%", height: 40, backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 15, marginBottom: 10 },
-  passwordInputContainer: { flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 15, marginBottom: 10 },
+  passwordInputContainer: { flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 15 },
   passwordInput: { flex: 1, height: 40 },
   eyeIcon: { width: 20, height: 20, marginLeft: 10 },
   loginButton: { width: "60%", alignSelf: "center", backgroundColor: "#8BC34A", padding: 12, borderRadius: 50, alignItems: "center", marginTop: 20 },

@@ -1,20 +1,35 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+// ✅ On importe la bonne fonction renommée
+import { initNotifications } from "./NotificationService";
 
-const NGROK_URL = 'https://eun-obvolutive-maynard.ngrok-free.dev'
+const NGROK_URL = 'https://eun-obvolutive-maynard.ngrok-free.dev';
 
 export const API_URL = Platform.select({
   android: NGROK_URL,
   web: "http://localhost:3000",
-});
+}) as string;
 
-// --- TYPES ---
 type AuthResponse = {
   access_token: string;
-  user?: { id: number; email: string; firstname: string; lastname: string };
+  user?: {
+    id: number;
+    email: string;
+    firstName: string;
+    lastName: string;
+    totalBalance?: number
+  };
 };
 
-type ApiError = { message: string; statusCode?: number };
+// ─── UTILS ─────────────────────────────────────────────────────────
+
+export async function getAuthHeaders() {
+  const token = await AsyncStorage.getItem("userToken");
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 // ─── AUTHENTIFICATION ──────────────────────────────────────────────
 
@@ -29,86 +44,102 @@ export async function login(email: string, password: string): Promise<AuthRespon
     const text = await response.text();
     const data = text ? JSON.parse(text) : {};
 
-    if (!response.ok) throw new Error(data.message || "Connexion échouée");
+    if (!response.ok) throw new Error(data.message || "Erreur de connexion");
 
-    if (data.access_token) await AsyncStorage.setItem("token", data.access_token);
-    if (data.user) await AsyncStorage.setItem("user", JSON.stringify(data.user));
+    if (data.access_token) {
+      await AsyncStorage.setItem("userToken", data.access_token);
 
-    return data as AuthResponse;
-  } catch (error: any) {
+      // ✅ Lancement des notifications après login réussi
+      try {
+        const pushToken = await initNotifications();
+        if (pushToken) {
+          await registerPushToken(pushToken);
+          console.log("🚀 [Push] Token enregistré avec succès");
+        }
+      } catch (pushErr) {
+        console.warn("[Push] Erreur lors de l'initialisation du token:", pushErr);
+      }
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Erreur API login:", error);
     throw error;
   }
 }
 
-export async function signup(
-  firstName: string, lastName: string, email: string,
-  password: string, confirmPassword: string, birthDate: string
-): Promise<AuthResponse> {
-  const response = await fetch(`${API_URL}/auth/signup`, {
+export async function register(userData: any): Promise<AuthResponse> {
+  const response = await fetch(`${API_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ firstName, lastName, email, password, confirmPassword, birthDate }),
+    body: JSON.stringify(userData),
   });
+  if (!response.ok) throw new Error("Erreur lors de l'inscription");
+  return response.json();
+}
 
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
+// ─── HELPERS REQUÊTES AUTHENTIFIÉES ───────────────────────────────
 
-  if (!response.ok) throw new Error(data.message || "Inscription échouée");
-  return data as AuthResponse;
+export async function getWithAuth<T>(endpoint: string): Promise<T> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}${endpoint}`, { headers });
+  if (!response.ok) throw new Error(`Erreur GET ${endpoint}`);
+  return response.json();
+}
+
+export async function sendWithAuth(endpoint: string, method: string, body?: any) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(`Erreur ${method} ${endpoint}`);
+  return response.json();
 }
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────
 
-// ✅ AJOUT — manquait, importée dans LoginScreen
 export async function registerPushToken(pushToken: string): Promise<void> {
-  const token = await AsyncStorage.getItem("token");
-  if (!token) return;
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/notifications/register-token`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ pushToken }),
+    });
 
-  const response = await fetch(`${API_URL}/notifications/register-token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({ pushToken }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : {};
-    throw new Error(data.message || "Erreur enregistrement token push");
+    if (!response.ok) {
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      throw new Error(data.message || "Erreur enregistrement token push");
+    }
+    console.log("✅ [API] Token push synchronisé avec le backend");
+  } catch (error) {
+    console.error("❌ [API] Erreur registerPushToken:", error);
   }
 }
 
-// ─── UTILS AUTH ───────────────────────────────────────────────────
+// ─── DÉPENSES & CATÉGORIES ──────────────────────────────────────────
 
-async function getAuthHeaders() {
-  const token = await AsyncStorage.getItem("token");
-  if (!token) throw new Error("Non connecté");
-  return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+export async function getCategories(): Promise<any[]> {
+  try {
+    const data = await getWithAuth<any[]>("/categories");
+    return data || [];
+  } catch (error) {
+    console.error("Erreur API getCategories:", error);
+    return [];
+  }
 }
 
-export async function sendWithAuth<T>(endpoint: string, method: 'POST' | 'PUT' | 'PATCH', body: any): Promise<T> {
-  const url = endpoint.startsWith("/") ? `${API_URL}${endpoint}` : `${API_URL}/${endpoint}`;
-  const response = await fetch(url, { method, headers: await getAuthHeaders(), body: JSON.stringify(body) });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
-  if (!response.ok) throw new Error(data.message || "Erreur requête");
-  return data as T;
+export async function getComparisonData(): Promise<any> {
+   return getWithAuth("/expenses/comparison");
 }
 
-export async function getWithAuth<T>(endpoint: string): Promise<T> {
-  const url = endpoint.startsWith("/") ? `${API_URL}${endpoint}` : `${API_URL}/${endpoint}`;
-  const response = await fetch(url, { method: "GET", headers: await getAuthHeaders() });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
-  if (!response.ok) throw new Error(data.message || "Erreur récupération");
-  return data as T;
+export async function getMyExpenses(): Promise<any[]> {
+  return getWithAuth("/expenses/me");
 }
 
-export async function logout(): Promise<void> {
-  await AsyncStorage.removeItem("token");
-  await AsyncStorage.removeItem("user");
+export async function createExpense(expenseData: any): Promise<any> {
+  return sendWithAuth("/expenses", "POST", expenseData);
 }

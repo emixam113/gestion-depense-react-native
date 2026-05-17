@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../Context/ThemeContext';
 import { useAccessibility } from '../../Context/Accessibility';
+import ImportScreen from '../../screens/ImportScreen';
 
 // Importation des icônes Lucide
 import {
@@ -28,7 +29,8 @@ import {
     FileText,
     Lock,
     Trash2,
-    LogOut
+    LogOut,
+    FileUp
 } from 'lucide-react-native';
 
 export default function Settings() {
@@ -129,9 +131,9 @@ export default function Settings() {
                         <User size={30} color={colors.textSecondary} />
                     </View>
                     <View style={styles.userInfo}>
-                        <Text style={[styles.userName, { color: colors.text }]}>Utilisateur</Text>
+                        <Text style={[styles.userName, { color: colors.text }]}>Profil Utilisateur</Text>
                         <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
-                            user@example.com
+                            Status, profil, nom, prénom
                         </Text>
                     </View>
                     <ChevronRight size={20} color={colors.textSecondary} strokeWidth={1.5} />
@@ -187,6 +189,13 @@ export default function Settings() {
                         title="Exporter les données"
                         onPress={() => router.push('/screens/ExportScreen')}
                         color="#007AFF"
+                    />
+
+                    <MenuItem
+                            icon={FileUp}
+                            title="importer les données"
+                            onPress={() => router.push('/screens/ImportScreen')}
+                            color='#444'
                     />
 
                     <MenuItem

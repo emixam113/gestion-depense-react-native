@@ -3,7 +3,7 @@ const Colors = {
   secondary: '#87DEAB',
   login: '#8EDFB1',
   botlogin: '#C3EBD4',
-  text: '#DFF7E2',
+  text: '#333',
 };
 
 export default Colors;

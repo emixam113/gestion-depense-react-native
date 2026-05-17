@@ -9,13 +9,13 @@ import {
   FlatList,
 } from 'react-native';
 import { Pencil, Trash2, CircleDollarSign, Receipt } from 'lucide-react-native';
-import { deleteWithAuth } from '../../services/Api';
-import { useTheme } from '../../Context/ThemeContext';
-import { useAccessibility } from '../../Context/Accessibility';
+import { deleteWithAuth } from '../services/Api';
+import { useTheme } from '../Context/ThemeContext';
+import { useAccessibility } from '../Context/Accessibility';
 import EditExpenseModal from './EditExpenseModale';
 
-import type { Expense } from '../../Types';
-import type { FontConfig } from '../../Context/Accessibility';
+import type { Expense } from '../Types';
+import type { FontConfig } from '../Context/Accessibility';
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -54,10 +54,17 @@ const ExpenseItem = memo(({
         onPress: async () => {
           setIsDeleting(true);
           try {
+            // ✅ On s'assure d'avoir le slash initial comme dans le PATCH
             await deleteWithAuth(`/expenses/${item.id}`);
+
+            // ✅ On met à jour la liste locale instantanément
             onDeleteSuccess(item.id);
-          } catch (error) {
-            Alert.alert('Erreur', 'Suppression impossible');
+          } catch (error: any) {
+            console.error("Erreur suppression:", error.response?.data || error.message);
+            Alert.alert(
+              'Erreur',
+              `Impossible de supprimer : ${error.response?.data?.message || error.message || "Erreur réseau"}`
+            );
           } finally {
             setIsDeleting(false);
           }
@@ -78,7 +85,6 @@ const ExpenseItem = memo(({
 
   return (
     <View style={[styles.item, { backgroundColor: colors.cardBackground }]}>
-      {/* SECTION GAUCHE : Icône + Libellés */}
       <View style={styles.leftContainer}>
         <View style={[styles.iconWrapper, { backgroundColor: isIncome ? '#2CC26D15' : '#FF6B6B15' }]}>
           {isIncome ?
@@ -88,15 +94,12 @@ const ExpenseItem = memo(({
         </View>
 
         <View style={styles.textContainer}>
-          <Text
-            numberOfLines={1}
-            style={[textStyle('semiBold', 15), { color: colors.text }]}
-          >
+          <Text numberOfLines={1} style={[textStyle('semiBold', 15), { color: colors.text }]}>
             {item.label}
           </Text>
           <View style={styles.metaRow}>
             <Text numberOfLines={1} style={[textStyle('regular', 12), { color: colors.textSecondary, flexShrink: 1 }]}>
-              {item.category.name}
+              {item.category?.name || 'Sans catégorie'}
             </Text>
             <Text style={[styles.separator, { color: colors.textSecondary }]}>•</Text>
             <Text style={[textStyle('regular', 12), { color: colors.textSecondary }]}>
@@ -106,7 +109,6 @@ const ExpenseItem = memo(({
         </View>
       </View>
 
-      {/* SECTION DROITE : Montant + Actions */}
       <View style={styles.rightContainer}>
         <Text style={[
           textStyle('bold', 14),
@@ -181,7 +183,6 @@ export default function ExpenseList({ expenses, onDeleteSuccess, onEditSuccess, 
         expense={editingExpense}
         onClose={() => setEditingExpense(null)}
         onSave={(u) => { onEditSuccess?.(u); setEditingExpense(null); }}
-        token={token}
       />
     </>
   );
@@ -196,67 +197,22 @@ const styles = StyleSheet.create({
     padding: 12,
     marginVertical: 6,
     borderRadius: 16,
-    // Ombre plus discrète pour le look épuré
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
-    elevation: 2,
   },
-  leftContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1, // Prend tout l'espace restant
-    marginRight: 10,
-  },
-  iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  separator: {
-    marginHorizontal: 4,
-    fontSize: 10,
-  },
-  rightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: -30,
-  },
-  amountText: {
-    textAlign: 'right',
-    marginRight: 10,
-    minWidth: 90,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  smallButton: {
-    width: 34,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-  },
+  leftContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 },
+  iconWrapper: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  textContainer: { flex: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  separator: { marginHorizontal: 4, fontSize: 10 },
+  rightContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  amountText: { textAlign: 'right', marginRight: 10, minWidth: 90 },
+  actionButtons: { flexDirection: 'row', gap: 6 },
+  smallButton: { width: 34, height: 34, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
   income: { color: '#2CC26D' },
   expense: { color: '#FF6B6B' },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 30,
-    fontSize: 14,
-    opacity: 0.5,
-  }
+  emptyText: { textAlign: 'center', marginTop: 30, fontSize: 14, opacity: 0.5 }
 });

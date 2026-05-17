@@ -7,14 +7,13 @@ import {
     StyleSheet,
     Modal,
     ScrollView,
-    Alert,
-    ActivityIndicator
+    Alert
 } from "react-native";
-import { useTheme } from '../../Context/ThemeContext';
-import { useAccessibility } from '../../Context/Accessibility';
-import { getWithAuth, sendWithAuth } from '../../services/Api';
+import { useTheme } from '../Context/ThemeContext';
+import { useAccessibility } from '../Context/Accessibility';
+import { getWithAuth, sendWithAuth } from '../services/Api';
 import { Pencil, X, Check, ArrowUpCircle, ArrowDownCircle, Tag } from 'lucide-react-native';
-import type { Expense, Category } from "../../Types";
+import type { Expense, Category } from "../Types";
 
 interface EditExpenseModalProps {
     visible: boolean;
@@ -40,13 +39,12 @@ export default function EditExpenseModal({
     });
 
     const [categories, setCategories] = useState<Category[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (visible && expense) {
             setForm({
                 label: expense.label,
-                // On affiche la valeur absolue pour l'édition[cite: 4]
                 amount: Math.abs(Number(expense.amount)).toString(),
                 type: expense.type,
                 categoryId: expense.category?.id || null
@@ -55,7 +53,6 @@ export default function EditExpenseModal({
         }
     }, [visible, expense]);
 
-    // Récupération automatique des catégories avec authentification[cite: 3]
     const loadCategories = async () => {
         try {
             const data = await getWithAuth<Category[]>('/categories');
@@ -72,9 +69,8 @@ export default function EditExpenseModal({
             return;
         }
 
-        setLoading(true);
+        setIsSubmitting(true);
         try {
-            // Logique automatisée : Dépense = Négatif, Revenu = Positif
             const rawAmount = Math.abs(Number(form.amount.replace(',', '.')));
             const signedAmount = form.type === 'expense' ? -rawAmount : rawAmount;
 
@@ -83,22 +79,23 @@ export default function EditExpenseModal({
                 amount: signedAmount,
                 type: form.type,
                 categoryId: form.categoryId,
-                date: expense.date // Conservation de la date originale
+                date: expense.date
             };
 
-            // Envoi automatisé vers l'API avec le token stocké[cite: 3]
+            // Envoi de la modification
             const updated = await sendWithAuth<Expense>(
                 `/expenses/${expense.id}`,
                 'PATCH',
                 payload
             );
 
-            onSave(updated); // Mise à jour de la liste parente
+            // CRUCIAL : On appelle onSave avec l'objet mis à jour
+            onSave(updated);
             onClose();
         } catch (err: any) {
-            Alert.alert("Erreur", err.message || "Impossible de modifier la dépense");
+            Alert.alert("Erreur", err.message || "Impossible de modifier");
         } finally {
-            setLoading(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -119,46 +116,36 @@ export default function EditExpenseModal({
                             <Pencil size={20} color={colors.primary} />
                         </View>
                         <Text style={[getTextStyle('bold', 20), { color: colors.text, flex: 1, marginLeft: 12 }]}>
-                            Modifier la transaction
+                            Modifier
                         </Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                             <X size={24} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                    <ScrollView showsVerticalScrollIndicator={false}>
                         <View style={styles.typeRow}>
                             <TouchableOpacity
-                                style={[
-                                    styles.typeButton,
-                                    form.type === "income" ? styles.activeIncome : { backgroundColor: colors.inputBackground }
-                                ]}
+                                style={[styles.typeButton, form.type === "income" ? styles.activeIncome : { backgroundColor: colors.inputBackground }]}
                                 onPress={() => setForm({ ...form, type: "income" })}
                             >
                                 <ArrowUpCircle size={20} color={form.type === "income" ? "#FFF" : "#2CC26D"} />
-                                <Text style={[getTextStyle('bold', 14), { color: form.type === "income" ? "#FFF" : colors.text, marginLeft: 8 }]}>
-                                    Revenu
-                                </Text>
+                                <Text style={[getTextStyle('bold', 14), { color: form.type === "income" ? "#FFF" : colors.text, marginLeft: 8 }]}>Revenu</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[
-                                    styles.typeButton,
-                                    form.type === "expense" ? styles.activeExpense : { backgroundColor: colors.inputBackground }
-                                ]}
+                                style={[styles.typeButton, form.type === "expense" ? styles.activeExpense : { backgroundColor: colors.inputBackground }]}
                                 onPress={() => setForm({ ...form, type: "expense" })}
                             >
                                 <ArrowDownCircle size={20} color={form.type === "expense" ? "#FFF" : "#FF6B6B"} />
-                                <Text style={[getTextStyle('bold', 14), { color: form.type === "expense" ? "#FFF" : colors.text, marginLeft: 8 }]}>
-                                    Dépense
-                                </Text>
+                                <Text style={[getTextStyle('bold', 14), { color: form.type === "expense" ? "#FFF" : colors.text, marginLeft: 8 }]}>Dépense</Text>
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.inputGroup}>
                             <Text style={[getTextStyle('semiBold', 14), { color: colors.textSecondary, marginBottom: 8 }]}>Libellé</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border, fontFamily: fontFamily.regular }]}
+                                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
                                 value={form.label}
                                 onChangeText={(text) => setForm({ ...form, label: text })}
                             />
@@ -167,18 +154,15 @@ export default function EditExpenseModal({
                         <View style={styles.inputGroup}>
                             <Text style={[getTextStyle('semiBold', 14), { color: colors.textSecondary, marginBottom: 8 }]}>Montant (€)</Text>
                             <TextInput
-                                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border, fontFamily: fontFamily.bold }]}
+                                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
                                 keyboardType="numeric"
                                 value={form.amount}
-                                onChangeText={(text) => setForm({ ...form, amount: text.replace(/[^0-9,.]/g, "") })}
+                                onChangeText={(text) => setForm({ ...form, amount: text })}
                             />
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                                <Tag size={16} color={colors.primary} />
-                                <Text style={[getTextStyle('semiBold', 14), { color: colors.textSecondary, marginLeft: 6 }]}>Catégorie</Text>
-                            </View>
+                            <Text style={[getTextStyle('semiBold', 14), { color: colors.textSecondary, marginBottom: 8 }]}>Catégorie</Text>
                             <View style={styles.categoryGrid}>
                                 {categories.map((cat) => (
                                     <TouchableOpacity
@@ -200,20 +184,13 @@ export default function EditExpenseModal({
                         </View>
 
                         <View style={styles.buttonRow}>
-                            <TouchableOpacity style={[styles.btn, styles.btnCancel]} onPress={onClose}>
-                                <Text style={[getTextStyle('bold', 15), { color: colors.textSecondary }]}>Annuler</Text>
-                            </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.btn, styles.btnSave, { backgroundColor: colors.primary }]}
+                                style={[styles.btn, { backgroundColor: colors.primary, opacity: isSubmitting ? 0.7 : 1 }]}
                                 onPress={handleSubmit}
-                                disabled={loading}
+                                disabled={isSubmitting}
                             >
-                                {loading ? <ActivityIndicator color="#FFF" /> : (
-                                    <>
-                                        <Check size={20} color="#FFF" style={{ marginRight: 8 }} />
-                                        <Text style={[getTextStyle('bold', 15), { color: "#FFF" }]}>Confirmer</Text>
-                                    </>
-                                )}
+                                <Check size={20} color="#FFF" style={{ marginRight: 8 }} />
+                                <Text style={[getTextStyle('bold', 15), { color: "#FFF" }]}>Confirmer</Text>
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
@@ -229,7 +206,6 @@ const styles = StyleSheet.create({
     modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
     titleIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     closeButton: { padding: 4 },
-    scrollContent: { paddingBottom: 20 },
     inputGroup: { marginBottom: 20 },
     input: { padding: 14, borderRadius: 12, fontSize: 16, borderWidth: 1.5 },
     typeRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
@@ -239,8 +215,6 @@ const styles = StyleSheet.create({
     categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     categoryChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 2, gap: 8 },
     colorDot: { width: 10, height: 10, borderRadius: 5 },
-    buttonRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
-    btn: { flex: 1, padding: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-    btnCancel: { backgroundColor: 'transparent' },
-    btnSave: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 }
+    buttonRow: { marginTop: 10 },
+    btn: { padding: 16, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }
 });
